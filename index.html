@@ -1,0 +1,2511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14b8a6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Nestly</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* ── Variables ───────────────────────────────────────── */
+    :root {
+      --bg:        #080e1a;
+      --surface:   #0d1526;
+      --surface2:  #141f35;
+      --surface3:  #1b2840;
+      --border:    rgba(255,255,255,0.07);
+      --border-hi: rgba(255,255,255,0.13);
+      --text:      #eaf0fb;
+      --muted:     #8896b0;
+      --teal:      #2dd4bf;
+      --teal-dim:  #14b8a6;
+      --teal-glow: rgba(45,212,191,0.28);
+      --feed:      #fbbf24;
+      --diaper:    #c084fc;
+      --sleep:     #60a5fa;
+      --burp:      #34d399;
+      --meal:      #fb923c;
+      --potty:     #a78bfa;
+      --activity:  #38bdf8;
+      --mood:      #f472b6;
+      --medicine:  #f87171;
+      --temp:      #fb7185;
+      --growth:    #a3e635;
+      --milestone: #fcd34d;
+      --nav-h:     68px;
+      --header-h:  60px;
+      --today-h:   40px;
+      --radius:    20px;
+      --radius-sm: 12px;
+    }
+
+    /* ── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    button { background: none; border: none; cursor: pointer; font: inherit; color: inherit; }
+    input, select, textarea {
+      font: inherit; color: var(--text);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 11px 14px; width: 100%; outline: none;
+      color-scheme: dark;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); }
+    textarea { resize: none; }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    #app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; position: relative; }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .header {
+      height: calc(var(--header-h) + env(safe-area-inset-top));
+      padding-top: env(safe-area-inset-top);
+      background: rgba(8,14,26,0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding-left: 16px; padding-right: 16px;
+      flex-shrink: 0;
+      position: relative; z-index: 10;
+    }
+    .header-logo { font-size: 18px; font-weight: 800; color: var(--teal); letter-spacing: -0.5px; }
+    .baby-switcher {
+      display: flex; align-items: center; gap: 7px;
+      background: var(--surface2); border: 1px solid var(--border-hi);
+      border-radius: 999px; padding: 5px 11px 5px 7px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .baby-switcher:active { background: var(--surface3); }
+    .baby-avatar { font-size: 20px; line-height: 1; }
+    .baby-name { font-size: 13px; font-weight: 700; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .baby-age { font-size: 10px; color: var(--muted); }
+    .baby-caret { color: var(--muted); font-size: 11px; }
+    .header-settings { width: 34px; height: 34px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
+    /* ── Today bar (frozen) ──────────────────────────────── */
+    .today-bar {
+      height: var(--today-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+    .today-label { font-size: 13px; font-weight: 800; color: var(--teal); letter-spacing: -0.2px; }
+    .today-date { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .today-log-btn {
+      background: var(--teal); color: #fff;
+      font-size: 12px; font-weight: 700;
+      padding: 5px 14px; border-radius: 999px;
+      transition: opacity 0.15s;
+    }
+    .today-log-btn:active { opacity: 0.8; }
+
+    /* ── Main scroll area ────────────────────────────────── */
+    .main { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+
+    /* ── Tab panes ───────────────────────────────────────── */
+    .tab-pane { display: none; padding: 14px 14px calc(var(--nav-h) + 20px + env(safe-area-inset-bottom)); }
+    .tab-pane.active { display: block; }
+
+    /* ── Bottom Nav ──────────────────────────────────────── */
+    .bottom-nav {
+      height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(8,14,26,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      display: flex; flex-shrink: 0;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 4px; padding: 10px 0;
+      color: var(--muted); transition: color 0.15s;
+    }
+    .nav-btn.active { color: var(--teal); }
+    .nav-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-btn span { font-size: 10px; font-weight: 600; }
+
+    /* ── Cards ───────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
+
+    /* ── Section label ───────────────────────────────────── */
+    .section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin: 16px 0 8px; }
+
+    /* ── Stat grid (home) — gradient cards ───────────────── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .stat-card {
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative; overflow: hidden;
+      border: 1px solid transparent;
+    }
+    .stat-card:active { transform: scale(0.96); }
+    .stat-card-glow { position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; opacity: 0.3; filter: blur(20px); }
+    .stat-card-icon { font-size: 24px; margin-bottom: 8px; }
+    .stat-card-label { font-size: 11px; font-weight: 600; opacity: 0.75; margin-bottom: 3px; }
+    .stat-card-value { font-size: 18px; font-weight: 800; line-height: 1.2; }
+    .stat-card-sub { font-size: 11px; opacity: 0.65; margin-top: 2px; }
+
+    /* ── Health mini-cards ───────────────────────────────── */
+    .health-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+    .health-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 6px;
+      text-align: center; cursor: pointer; transition: transform 0.15s;
+    }
+    .health-card:active { transform: scale(0.94); }
+    .health-card-icon { font-size: 20px; margin-bottom: 4px; }
+    .health-card-label { font-size: 10px; font-weight: 600; color: var(--muted); }
+    .health-card-val { font-size: 11px; font-weight: 700; margin-top: 2px; }
+
+    /* ── Sleep banner ────────────────────────────────────── */
+    .sleep-banner {
+      background: linear-gradient(135deg, rgba(37,99,235,0.25), rgba(29,78,216,0.12));
+      border: 1px solid rgba(96,165,250,0.35);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sleep-banner-left { display: flex; align-items: center; gap: 12px; }
+    .sleep-banner-icon { font-size: 26px; }
+    .sleep-banner-label { font-size: 11px; color: #93c5fd; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .sleep-banner-time { font-size: 26px; font-weight: 800; color: #dbeafe; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+
+    /* ── Totals row ──────────────────────────────────────── */
+    .totals-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px;
+    }
+    .totals-row { display: flex; }
+    .total-item { flex: 1; text-align: center; }
+    .total-item + .total-item { border-left: 1px solid var(--border); }
+    .total-value { font-size: 22px; font-weight: 800; }
+    .total-label { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 500; }
+
+    /* ── Log grid ────────────────────────────────────────── */
+    .log-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .log-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
+      cursor: pointer; transition: transform 0.12s, border-color 0.15s, background 0.15s;
+      position: relative; overflow: hidden;
+    }
+    .log-btn:active { transform: scale(0.94); }
+    .log-btn-icon { font-size: 30px; }
+    .log-btn-label { font-size: 13px; font-weight: 700; text-align: center; }
+    .log-btn-sub { font-size: 10px; color: var(--muted); text-align: center; }
+    .log-btn.active-sleep { border-color: var(--sleep); background: rgba(96,165,250,0.1); }
+    .log-btn-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; border-radius: 0 0 2px 2px; }
+
+    /* ── Sleep toggle (full-width) ───────────────────────── */
+    .sleep-toggle-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 15px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; transition: all 0.15s; margin-bottom: 12px;
+    }
+    .sleep-toggle-btn.active { border-color: rgba(96,165,250,0.5); background: rgba(96,165,250,0.07); }
+    .sleep-toggle-left { display: flex; align-items: center; gap: 12px; }
+    .sleep-toggle-icon { font-size: 26px; }
+    .sleep-toggle-label { font-size: 15px; font-weight: 700; }
+    .sleep-toggle-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .pill { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pill.nap { background: rgba(96,165,250,0.18); color: #93c5fd; }
+    .pill.night { background: rgba(139,92,246,0.18); color: #c4b5fd; }
+    .pill.active { background: rgba(96,165,250,0.22); color: #93c5fd; }
+
+    /* ── Timeline view toggle ────────────────────────────── */
+    .view-toggle { display: flex; background: var(--surface2); border-radius: 999px; padding: 3px; gap: 2px; margin-bottom: 14px; }
+    .view-btn { flex: 1; padding: 7px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; transition: all 0.15s; }
+    .view-btn.active { background: var(--teal); color: #fff; }
+
+    /* ── Calendar ────────────────────────────────────────── */
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .cal-nav-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    .cal-nav-label { font-size: 15px; font-weight: 800; }
+    .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
+    .cal-wd { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 4px 0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 16px; }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 10px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; cursor: pointer;
+      transition: background 0.15s; position: relative;
+    }
+    .cal-day:active { background: var(--surface3); }
+    .cal-day.today { background: var(--surface2); }
+    .cal-day.selected { background: var(--teal); }
+    .cal-day.empty { cursor: default; }
+    .cal-day-num { font-size: 13px; font-weight: 600; }
+    .cal-day.selected .cal-day-num { color: #fff; font-weight: 800; }
+    .cal-day.today .cal-day-num { color: var(--teal); font-weight: 800; }
+    .cal-dots { display: flex; gap: 2px; margin-top: 2px; flex-wrap: wrap; justify-content: center; max-width: 28px; }
+    .cal-dot { width: 4px; height: 4px; border-radius: 50%; }
+
+    /* ── Timeline ────────────────────────────────────────── */
+    .timeline-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filter-chip {
+      padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .filter-chip.active { background: var(--teal); border-color: var(--teal); color: #080e1a; }
+    .timeline-day-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 0 6px; }
+    .timeline-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 11px 10px 11px 14px;
+      margin-bottom: 7px; display: flex; align-items: center; gap: 10px; position: relative;
+    }
+    .timeline-accent { width: 3px; height: calc(100% - 16px); position: absolute; left: 0; top: 8px; border-radius: 2px; }
+    .timeline-icon { font-size: 20px; flex-shrink: 0; }
+    .timeline-content { flex: 1; min-width: 0; }
+    .timeline-title { font-size: 14px; font-weight: 700; }
+    .timeline-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .timeline-time { font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; line-height: 1.4; }
+    .timeline-actions { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+    .tl-btn { padding: 6px 7px; font-size: 14px; color: var(--muted); opacity: 0.6; transition: opacity 0.15s; }
+    .tl-btn:active { opacity: 1; }
+    .tl-edit:active { color: var(--teal); }
+    .tl-del:active { color: var(--medicine); }
+    .timeline-empty { text-align: center; color: var(--muted); padding: 48px 0; font-size: 14px; line-height: 1.6; }
+
+    /* ── Stats ───────────────────────────────────────────── */
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .stats-num-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px; text-align: center; }
+    .stats-num { font-size: 22px; font-weight: 800; }
+    .stats-num-label { font-size: 10px; color: var(--muted); margin-top: 2px; font-weight: 600; }
+    .bar-chart { margin-bottom: 4px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .bar-day { width: 30px; font-size: 11px; color: var(--muted); text-align: right; flex-shrink: 0; font-weight: 600; }
+    .bar-track { flex: 1; height: 20px; background: var(--surface2); border-radius: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); display: flex; align-items: center; padding: 0 8px; }
+    .bar-val { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); white-space: nowrap; }
+    .streak-banner {
+      background: linear-gradient(135deg, rgba(16,82,40,0.4), rgba(13,20,26,0.4));
+      border: 1px solid rgba(52,211,153,0.35); border-radius: var(--radius);
+      padding: 14px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .streak-icon { font-size: 28px; }
+    .streak-label { font-size: 12px; color: #6ee7b7; font-weight: 700; }
+    .streak-value { font-size: 24px; font-weight: 800; color: #34d399; }
+
+    /* ── Modals ──────────────────────────────────────────── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 100;
+      display: none; align-items: flex-end; justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+    .overlay.open { display: flex; }
+    .sheet {
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+      width: 100%; max-width: 430px;
+      max-height: 92vh; overflow-y: auto;
+      animation: slideUp 0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+    @keyframes slideUp { from { transform: translateY(100%); opacity:0; } to { transform: translateY(0); opacity:1; } }
+    .sheet-handle { width: 36px; height: 4px; background: var(--border-hi); border-radius: 2px; margin: 10px auto 0; }
+    .sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 10px; }
+    .sheet-title { font-size: 18px; font-weight: 800; }
+    .sheet-close { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--muted); }
+    .sheet-body { padding: 0 20px; }
+
+    /* ── Form ────────────────────────────────────────────── */
+    .form-row { margin-bottom: 16px; }
+    .form-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 7px; display: block; }
+    .seg-control { display: flex; background: var(--surface2); border-radius: var(--radius-sm); padding: 3px; gap: 2px; }
+    .seg-btn { flex: 1; padding: 8px 4px; border-radius: 9px; font-size: 13px; font-weight: 700; text-align: center; color: var(--muted); transition: all 0.15s; }
+    .seg-btn.active { background: var(--teal); color: #080e1a; }
+    .oz-stepper { display: flex; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+    .oz-step-btn { width: 56px; height: 56px; font-size: 24px; font-weight: 700; color: var(--teal); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .oz-step-btn:active { background: var(--surface3); }
+    .oz-val { flex: 1; text-align: center; font-size: 30px; font-weight: 800; }
+    .oz-unit { font-size: 13px; color: var(--muted); font-weight: 600; padding-right: 14px; }
+    .timer-display { text-align: center; padding: 16px 0; }
+    .timer-num { font-size: 52px; font-weight: 800; color: var(--sleep); font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+    .timer-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .emoji-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }
+    .emoji-opt { font-size: 26px; text-align: center; padding: 6px; border-radius: var(--radius-sm); cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+    .emoji-opt.selected { border-color: var(--teal); background: rgba(45,212,191,0.12); }
+    .mood-grid { display: flex; gap: 8px; }
+    .mood-btn { flex: 1; text-align: center; padding: 12px 0; border-radius: var(--radius-sm); background: var(--surface2); border: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
+    .mood-btn .mood-emoji { font-size: 24px; }
+    .mood-btn .mood-label { font-size: 9px; color: var(--muted); margin-top: 4px; font-weight: 600; }
+    .mood-btn.selected { border-color: var(--mood); background: rgba(244,114,182,0.1); }
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .type-btn { padding: 16px 12px; border-radius: var(--radius-sm); background: var(--surface2); border: 2px solid transparent; cursor: pointer; text-align: center; transition: all 0.15s; }
+    .type-btn .type-icon { font-size: 26px; margin-bottom: 6px; }
+    .type-btn .type-label { font-size: 13px; font-weight: 700; }
+    .type-btn.selected { border-color: var(--teal); background: rgba(45,212,191,0.08); }
+    .btn-primary { display: block; width: 100%; padding: 15px; border-radius: var(--radius); background: linear-gradient(135deg, var(--teal), var(--teal-dim)); color: #080e1a; font-size: 16px; font-weight: 800; text-align: center; margin-top: 20px; box-shadow: 0 4px 20px var(--teal-glow); transition: opacity 0.15s, transform 0.12s; }
+    .btn-primary:active { opacity: 0.85; transform: scale(0.98); }
+    .btn-secondary { display: block; width: 100%; padding: 13px; border-radius: var(--radius); background: var(--surface2); color: var(--text); font-size: 15px; font-weight: 700; text-align: center; margin-top: 10px; border: 1px solid var(--border); transition: background 0.15s; }
+    .btn-secondary:active { background: var(--surface3); }
+    .btn-danger { background: rgba(248,113,113,0.12); color: #f87171; border-color: rgba(248,113,113,0.25); }
+    .btn-danger:active { background: rgba(248,113,113,0.22); }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .toggle-label { font-size: 14px; font-weight: 600; }
+    .toggle-sub { font-size: 12px; color: var(--muted); }
+    .toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track { position: absolute; inset: 0; background: var(--surface3); border-radius: 13px; cursor: pointer; transition: background 0.2s; }
+    .toggle-track::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+    .toggle-switch input:checked + .toggle-track { background: var(--teal); }
+    .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    /* ── Baby drawer ─────────────────────────────────────── */
+    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .drawer-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; border: 2px solid transparent; }
+    .drawer-avatar.active { border-color: var(--teal); }
+    .drawer-info { flex: 1; }
+    .drawer-name { font-size: 15px; font-weight: 700; }
+    .drawer-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .drawer-mode-badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+    .drawer-mode-badge.baby { background: rgba(251,191,36,0.18); color: #fbbf24; }
+    .drawer-mode-badge.toddler { background: rgba(45,212,191,0.18); color: var(--teal); }
+    .drawer-add { display: flex; align-items: center; gap: 10px; padding: 14px 0 4px; color: var(--teal); font-size: 14px; font-weight: 700; cursor: pointer; }
+
+    /* ── Welcome ─────────────────────────────────────────── */
+    #welcome { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 40px 24px; text-align: center; }
+    #welcome.visible { display: flex; }
+    .welcome-logo { font-size: 72px; margin-bottom: 16px; }
+    .welcome-title { font-size: 32px; font-weight: 900; color: var(--teal); margin-bottom: 8px; letter-spacing: -1px; }
+    .welcome-sub { font-size: 15px; color: var(--muted); margin-bottom: 36px; line-height: 1.6; }
+
+    /* ── Misc ────────────────────────────────────────────── */
+    .text-muted { color: var(--muted); }
+    .mt-12 { margin-top: 12px; }
+    .inline-timer { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .settings-label { font-size: 14px; font-weight: 600; }
+    .settings-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .btn-sm { padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s; }
+    .btn-sm:active { background: var(--surface3); }
+    .btn-sm.teal { background: rgba(45,212,191,0.12); border-color: var(--teal); color: var(--teal); }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%);
+      background: var(--surface2); border: 1px solid var(--border-hi);
+      color: var(--text); padding: 10px 20px; border-radius: 999px;
+      font-size: 14px; font-weight: 700; z-index: 300;
+      animation: toastIn 0.2s ease, toastOut 0.3s ease 1.4s forwards;
+      white-space: nowrap; pointer-events: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    @keyframes toastOut { to { opacity:0; transform:translateX(-50%) translateY(4px); } }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid var(--border);
+      color: var(--text); padding: 10px 20px; border-radius: 999px;
+      font-size: 14px; font-weight: 600; z-index: 300;
+      animation: toastIn 0.2s ease, toastOut 0.3s ease 1.4s forwards;
+      white-space: nowrap; pointer-events: none;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    @keyframes toastOut { to { opacity:0; transform:translateX(-50%) translateY(4px); } }
+
+    /* ── Export/Import ───────────────────────────────────── */
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .settings-label { font-size: 14px; font-weight: 500; }
+    .settings-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .btn-sm { padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; background: var(--surface2); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s; }
+    .btn-sm:active { background: var(--border); }
+    .btn-sm.teal { background: rgba(20,184,166,0.15); border-color: var(--teal); color: var(--teal); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Welcome screen (first run) -->
+  <div id="welcome">
+    <div class="welcome-logo">🌱</div>
+    <div class="welcome-title">Nestly</div>
+    <div class="welcome-sub">Track feeds, sleep, diapers and more — all in one place.</div>
+    <button class="btn-primary" style="max-width:280px;" onclick="openAddBabyModal()">Add Your Baby</button>
+    <button class="btn-secondary" style="max-width:280px;margin-top:10px;" onclick="importData()">Restore from Backup</button>
+  </div>
+
+  <!-- Main app -->
+  <div id="main-ui" style="display:none; flex-direction:column; height:100%;">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-logo">🌱 Nestly</div>
+      <div class="baby-switcher" onclick="openBabyDrawer()">
+        <span class="baby-avatar" id="hdr-avatar">🍼</span>
+        <div>
+          <div class="baby-name" id="hdr-name">Loading…</div>
+          <div class="baby-age" id="hdr-age"></div>
+        </div>
+        <span class="baby-caret">▾</span>
+      </div>
+      <button class="header-settings" onclick="openBabySettings()">⚙️</button>
+    </header>
+
+    <!-- Today bar (frozen) -->
+    <div class="today-bar" id="today-bar">
+      <div>
+        <div class="today-label" id="today-day-label">Today</div>
+      </div>
+      <div class="today-date" id="today-date-label"></div>
+      <button class="today-log-btn" onclick="switchTab('log',document.querySelector('[data-tab=log]'))">+ Log</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="main" id="tabs-main">
+
+      <!-- HOME -->
+      <div class="tab-pane active" id="tab-home">
+        <div id="home-sleep-banner"></div>
+        <div id="home-stat-grid" class="stat-grid"></div>
+        <div id="home-totals"></div>
+        <div class="section-label">Health &amp; Milestones</div>
+        <div class="health-grid" id="home-health-grid"></div>
+        <div id="home-streak"></div>
+      </div>
+
+      <!-- LOG -->
+      <div class="tab-pane" id="tab-log">
+        <div id="log-sleep-toggle"></div>
+        <div class="section-label" id="log-section-primary">Core</div>
+        <div class="log-grid" id="log-grid-primary"></div>
+        <div class="section-label mt-12">Health &amp; Milestones</div>
+        <div class="log-grid" id="log-grid-extra"></div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="tab-pane" id="tab-timeline">
+        <div class="view-toggle">
+          <button class="view-btn active" id="view-btn-list" onclick="setTimelineView('list')">☰ List</button>
+          <button class="view-btn" id="view-btn-cal" onclick="setTimelineView('calendar')">📅 Calendar</button>
+        </div>
+        <!-- List view -->
+        <div id="timeline-list-wrap">
+          <div class="timeline-filter" id="timeline-filter"></div>
+          <div id="timeline-list"></div>
+        </div>
+        <!-- Calendar view -->
+        <div id="timeline-cal-wrap" style="display:none;">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+            <div class="cal-nav-label" id="cal-month-label"></div>
+            <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+          </div>
+          <div class="cal-weekdays">
+            <div class="cal-wd">Mon</div><div class="cal-wd">Tue</div><div class="cal-wd">Wed</div>
+            <div class="cal-wd">Thu</div><div class="cal-wd">Fri</div><div class="cal-wd">Sat</div><div class="cal-wd">Sun</div>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <div id="cal-day-events"></div>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div class="tab-pane" id="tab-stats">
+        <div id="stats-content"></div>
+      </div>
+
+    </div><!-- /main -->
+
+    <!-- FAB -->
+    <button class="fab" id="fab-log" onclick="switchTab('log',document.querySelector('[data-tab=log]'))" style="
+      position:absolute; right:16px;
+      bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+      width:52px; height:52px; border-radius:50%;
+      background:linear-gradient(135deg,#2dd4bf,#14b8a6);
+      box-shadow:0 6px 24px rgba(45,212,191,0.45);
+      font-size:26px; color:#080e1a;
+      display:flex; align-items:center; justify-content:center;
+      z-index:50; transition:transform 0.15s, box-shadow 0.15s;">
+      +
+    </button>
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="home" onclick="switchTab('home', this)">
+        <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9M5 10v9a1 1 0 001 1h4v-4h4v4h4a1 1 0 001-1v-9"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-tab="log" onclick="switchTab('log', this)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span>Log</span>
+      </button>
+      <button class="nav-btn" data-tab="timeline" onclick="switchTab('timeline', this)">
+        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1.5"/><circle cx="3" cy="12" r="1.5"/><circle cx="3" cy="18" r="1.5"/></svg>
+        <span>Timeline</span>
+      </button>
+      <button class="nav-btn" data-tab="stats" onclick="switchTab('stats', this)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>
+        <span>Stats</span>
+      </button>
+    </nav>
+
+  </div><!-- /main-ui -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  MODALS                                                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<!-- Baby Drawer -->
+<div class="overlay" id="overlay-babies" onclick="if(event.target===this)closeBabyDrawer()">
+  <div class="sheet" style="padding-bottom: calc(16px + env(safe-area-inset-bottom));">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Profiles</div>
+      <button class="sheet-close" onclick="closeBabyDrawer()">✕</button>
+    </div>
+    <div class="sheet-body" id="baby-drawer-list"></div>
+  </div>
+</div>
+
+<!-- Add / Edit Baby -->
+<div class="overlay" id="overlay-add-baby" onclick="if(event.target===this)closeModal('overlay-add-baby')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="add-baby-title">Add Baby</div>
+      <button class="sheet-close" onclick="closeModal('overlay-add-baby')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Baby's Name</label>
+        <input type="text" id="baby-name-input" placeholder="e.g. Ollie" maxlength="24">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date of Birth</label>
+        <input type="date" id="baby-dob-input">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Avatar Emoji</label>
+        <div class="emoji-grid" id="baby-emoji-grid"></div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Age Mode</label>
+        <div class="seg-control">
+          <div class="seg-btn active" data-mode="auto" onclick="selectBabyMode('auto')">Auto</div>
+          <div class="seg-btn" data-mode="baby" onclick="selectBabyMode('baby')">Baby</div>
+          <div class="seg-btn" data-mode="toddler" onclick="selectBabyMode('toddler')">Toddler</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Potty Training</div>
+            <div class="toggle-sub">Show Potty instead of Diaper</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="baby-potty-toggle">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+      <input type="hidden" id="baby-edit-id">
+      <button class="btn-primary" onclick="saveBaby()">Save Profile</button>
+      <button class="btn-secondary btn-danger" id="baby-delete-btn" style="display:none;" onclick="deleteBabyConfirm()">Delete Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- Feed Modal -->
+<div class="overlay" id="overlay-feed" onclick="if(event.target===this)closeModal('overlay-feed')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">🍼 Feed</div>
+      <button class="sheet-close" onclick="closeModal('overlay-feed')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Feed Type</label>
+        <div class="seg-control">
+          <div class="seg-btn active" data-feed="bottle" onclick="selectFeedType('bottle')">Bottle</div>
+          <div class="seg-btn" data-feed="breast" onclick="selectFeedType('breast')">Breast</div>
+          <div class="seg-btn" data-feed="mixed" onclick="selectFeedType('mixed')">Mixed</div>
+        </div>
+      </div>
+
+      <!-- Bottle / Mixed -->
+      <div id="feed-oz-section">
+        <div class="form-row">
+          <label class="form-label">Amount</label>
+          <div class="oz-stepper">
+            <button class="oz-step-btn" onclick="stepOz(-0.5)">−</button>
+            <div class="oz-val" id="oz-display">3.0</div>
+            <div class="oz-unit">oz</div>
+            <button class="oz-step-btn" onclick="stepOz(0.5)">+</button>
+          </div>
+        </div>
+        <div class="form-row" id="feed-formula-row">
+          <label class="form-label">Type</label>
+          <div class="seg-control">
+            <div class="seg-btn active" data-formula="formula" onclick="selectFormulaType('formula')">Formula</div>
+            <div class="seg-btn" data-formula="expressed" onclick="selectFormulaType('expressed')">Expressed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breast -->
+      <div id="feed-breast-section" style="display:none;">
+        <div class="form-row">
+          <label class="form-label">Side</label>
+          <div class="seg-control">
+            <div class="seg-btn active" data-side="L" onclick="selectBreastSide('L')">Left</div>
+            <div class="seg-btn" data-side="R" onclick="selectBreastSide('R')">Right</div>
+            <div class="seg-btn" data-side="B" onclick="selectBreastSide('B')">Both</div>
+          </div>
+        </div>
+        <div class="timer-display">
+          <div class="timer-num" id="breast-timer-num">0:00</div>
+          <div class="timer-label" id="breast-timer-label">Tap to start timer</div>
+        </div>
+        <button class="btn-secondary" id="breast-timer-btn" onclick="toggleBreastTimer()">▶ Start Timer</button>
+      </div>
+
+      <div class="form-row mt-12">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="feed-note" placeholder="e.g. seemed hungry, fussy…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="feed-datetime">
+      </div>
+      <button class="btn-primary" id="feed-save-btn" onclick="saveFeed()">Save Feed</button>
+    </div>
+  </div>
+</div>
+
+<!-- Diaper Modal -->
+<div class="overlay" id="overlay-diaper" onclick="if(event.target===this)closeModal('overlay-diaper')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">🩲 Diaper</div>
+      <button class="sheet-close" onclick="closeModal('overlay-diaper')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Type</label>
+        <div class="type-grid">
+          <div class="type-btn selected" data-diaper="wet" onclick="selectDiaperType('wet')"><div class="type-icon">💧</div><div class="type-label">Wet</div></div>
+          <div class="type-btn" data-diaper="dirty" onclick="selectDiaperType('dirty')"><div class="type-icon">💩</div><div class="type-label">Dirty</div></div>
+          <div class="type-btn" data-diaper="both" onclick="selectDiaperType('both')"><div class="type-icon">🔄</div><div class="type-label">Both</div></div>
+          <div class="type-btn" data-diaper="dry" onclick="selectDiaperType('dry')"><div class="type-icon">✅</div><div class="type-label">Dry</div></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="diaper-note" placeholder="Color, consistency…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="diaper-datetime">
+      </div>
+      <button class="btn-primary" id="diaper-save-btn" onclick="saveDiaper()">Save Diaper</button>
+    </div>
+  </div>
+</div>
+
+<!-- Potty Modal -->
+<div class="overlay" id="overlay-potty" onclick="if(event.target===this)closeModal('overlay-potty')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">🚽 Potty</div>
+      <button class="sheet-close" onclick="closeModal('overlay-potty')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Type</label>
+        <div class="type-grid">
+          <div class="type-btn selected" data-potty="pee" onclick="selectPottyType('pee')"><div class="type-icon">💛</div><div class="type-label">Pee</div></div>
+          <div class="type-btn" data-potty="poop" onclick="selectPottyType('poop')"><div class="type-icon">💩</div><div class="type-label">Poop</div></div>
+          <div class="type-btn" data-potty="both" onclick="selectPottyType('both')"><div class="type-icon">✅</div><div class="type-label">Both</div></div>
+          <div class="type-btn" data-potty="accident" onclick="selectPottyType('accident')"><div class="type-icon">😬</div><div class="type-label">Accident</div></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="potty-note" placeholder="Any notes…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="potty-datetime">
+      </div>
+      <button class="btn-primary" id="potty-save-btn" onclick="savePotty()">Save Potty</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sleep start modal -->
+<div class="overlay" id="overlay-sleep-type" onclick="if(event.target===this)closeModal('overlay-sleep-type')">
+  <div class="sheet" style="padding-bottom:calc(16px + env(safe-area-inset-bottom));">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">💤 Start Sleep</div>
+      <button class="sheet-close" onclick="closeModal('overlay-sleep-type')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Sleep Type</label>
+        <div class="type-grid">
+          <div class="type-btn selected" data-sleep="nap" onclick="selectSleepType('nap')"><div class="type-icon">🌤️</div><div class="type-label">Nap</div></div>
+          <div class="type-btn" data-sleep="night" onclick="selectSleepType('night')"><div class="type-icon">🌙</div><div class="type-label">Night Sleep</div></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Start Time</label>
+        <input type="datetime-local" id="sleep-start-time">
+      </div>
+      <button class="btn-primary" onclick="confirmStartSleep()">Start Tracking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sleep stop modal -->
+<div class="overlay" id="overlay-sleep-stop" onclick="if(event.target===this)closeModal('overlay-sleep-stop')">
+  <div class="sheet" style="padding-bottom:calc(16px + env(safe-area-inset-bottom));">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">💤 End Sleep</div>
+      <button class="sheet-close" onclick="closeModal('overlay-sleep-stop')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Start Time</label>
+        <input type="datetime-local" id="sleep-stop-start">
+      </div>
+      <div class="form-row">
+        <label class="form-label">End Time</label>
+        <input type="datetime-local" id="sleep-stop-end">
+      </div>
+      <div style="text-align:center;padding:4px 0 8px;color:var(--teal);font-size:13px;font-weight:700;" id="sleep-stop-duration"></div>
+      <button class="btn-primary" onclick="confirmStopSleep()">Save Sleep</button>
+    </div>
+  </div>
+</div>
+
+<!-- Meal Modal -->
+<div class="overlay" id="overlay-meal" onclick="if(event.target===this)closeModal('overlay-meal')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">🍽️ Meal</div>
+      <button class="sheet-close" onclick="closeModal('overlay-meal')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Meal Type</label>
+        <div class="seg-control">
+          <div class="seg-btn active" data-meal="breakfast" onclick="selectMealType('breakfast')">Breakfast</div>
+          <div class="seg-btn" data-meal="lunch" onclick="selectMealType('lunch')">Lunch</div>
+          <div class="seg-btn" data-meal="dinner" onclick="selectMealType('dinner')">Dinner</div>
+          <div class="seg-btn" data-meal="snack" onclick="selectMealType('snack')">Snack</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">How Much?</label>
+        <div class="type-grid">
+          <div class="type-btn selected" data-quality="well" onclick="selectMealQuality('well')"><div class="type-icon">😊</div><div class="type-label">Ate Well</div></div>
+          <div class="type-btn" data-quality="partial" onclick="selectMealQuality('partial')"><div class="type-icon">😐</div><div class="type-label">Partial</div></div>
+          <div class="type-btn" data-quality="refused" onclick="selectMealQuality('refused')"><div class="type-icon">🙅</div><div class="type-label">Refused</div></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">What did they eat? (optional)</label>
+        <input type="text" id="meal-food" placeholder="e.g. pasta, fruit, yoghurt…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="meal-datetime">
+      </div>
+      <button class="btn-primary" id="meal-save-btn" onclick="saveMeal()">Save Meal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Modal -->
+<div class="overlay" id="overlay-activity" onclick="if(event.target===this)closeModal('overlay-activity')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">⚽ Activity</div>
+      <button class="sheet-close" onclick="closeModal('overlay-activity')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Activity Type</label>
+        <div class="type-grid">
+          <div class="type-btn selected" data-activity="outside" onclick="selectActivityType('outside')"><div class="type-icon">🌳</div><div class="type-label">Outside</div></div>
+          <div class="type-btn" data-activity="quiet" onclick="selectActivityType('quiet')"><div class="type-icon">📚</div><div class="type-label">Quiet Play</div></div>
+          <div class="type-btn" data-activity="screen" onclick="selectActivityType('screen')"><div class="type-icon">📺</div><div class="type-label">Screen Time</div></div>
+          <div class="type-btn" data-activity="bath" onclick="selectActivityType('bath')"><div class="type-icon">🛁</div><div class="type-label">Bath</div></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Duration (optional)</label>
+        <input type="number" id="activity-duration" placeholder="Minutes" min="1" max="300">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="activity-datetime">
+      </div>
+      <button class="btn-primary" id="activity-save-btn" onclick="saveActivity()">Save Activity</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mood Modal -->
+<div class="overlay" id="overlay-mood" onclick="if(event.target===this)closeModal('overlay-mood')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">😊 Mood</div>
+      <button class="sheet-close" onclick="closeModal('overlay-mood')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">How are they feeling?</label>
+        <div class="mood-grid">
+          <div class="mood-btn" data-mood="1" onclick="selectMood(1)"><div class="mood-emoji">😭</div><div class="mood-label">Upset</div></div>
+          <div class="mood-btn" data-mood="2" onclick="selectMood(2)"><div class="mood-emoji">😟</div><div class="mood-label">Fussy</div></div>
+          <div class="mood-btn" data-mood="3" onclick="selectMood(3)"><div class="mood-emoji">😐</div><div class="mood-label">Okay</div></div>
+          <div class="mood-btn" data-mood="4" onclick="selectMood(4)"><div class="mood-emoji">🙂</div><div class="mood-label">Happy</div></div>
+          <div class="mood-btn selected" data-mood="5" onclick="selectMood(5)"><div class="mood-emoji">😄</div><div class="mood-label">Great</div></div>
+        </div>
+      </div>
+      <div class="form-row mt-12">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="mood-note" placeholder="Teething, growth spurt…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="mood-datetime">
+      </div>
+      <button class="btn-primary" id="mood-save-btn" onclick="saveMood()">Save Mood</button>
+    </div>
+  </div>
+</div>
+
+<!-- Medicine Modal -->
+<div class="overlay" id="overlay-medicine" onclick="if(event.target===this)closeModal('overlay-medicine')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">💊 Medicine</div>
+      <button class="sheet-close" onclick="closeModal('overlay-medicine')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Medicine Name</label>
+        <input type="text" id="medicine-name" placeholder="e.g. Panadol, Vitamin D…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Dose</label>
+        <input type="text" id="medicine-dose" placeholder="e.g. 2.5ml, 1 tablet…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="medicine-note" placeholder="Reason, instructions…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="medicine-datetime">
+      </div>
+      <button class="btn-primary" id="medicine-save-btn" onclick="saveMedicine()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Temperature Modal -->
+<div class="overlay" id="overlay-temp" onclick="if(event.target===this)closeModal('overlay-temp')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">🌡️ Temperature</div>
+      <button class="sheet-close" onclick="closeModal('overlay-temp')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Temperature</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="temp-value" placeholder="37.0" step="0.1" min="34" max="42" style="font-size:24px;font-weight:700;text-align:center;">
+          <div class="seg-control" style="width:120px;flex-shrink:0;">
+            <div class="seg-btn active" data-unit="C" onclick="selectTempUnit('C')">°C</div>
+            <div class="seg-btn" data-unit="F" onclick="selectTempUnit('F')">°F</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="temp-note" placeholder="Location: armpit, ear…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="temp-datetime">
+      </div>
+      <button class="btn-primary" id="temp-save-btn" onclick="saveTemp()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Growth Modal -->
+<div class="overlay" id="overlay-growth" onclick="if(event.target===this)closeModal('overlay-growth')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">📏 Growth</div>
+      <button class="sheet-close" onclick="closeModal('overlay-growth')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Weight (kg)</label>
+        <input type="number" id="growth-weight" placeholder="e.g. 8.5" step="0.1" min="1" max="30">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Height (cm)</label>
+        <input type="number" id="growth-height" placeholder="e.g. 70" step="0.5" min="30" max="130">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Head Circumference (cm, optional)</label>
+        <input type="number" id="growth-head" placeholder="e.g. 42" step="0.5" min="20" max="60">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="growth-datetime">
+      </div>
+      <button class="btn-primary" id="growth-save-btn" onclick="saveGrowth()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Milestone Modal -->
+<div class="overlay" id="overlay-milestone" onclick="if(event.target===this)closeModal('overlay-milestone')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">⭐ Milestone</div>
+      <button class="sheet-close" onclick="closeModal('overlay-milestone')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-row">
+        <label class="form-label">Milestone</label>
+        <input type="text" id="milestone-title" placeholder="e.g. First smile, first steps…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Notes (optional)</label>
+        <textarea id="milestone-note" rows="3" placeholder="Tell the story…"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date &amp; Time</label>
+        <input type="datetime-local" id="milestone-datetime">
+      </div>
+      <button class="btn-primary" id="milestone-save-btn" onclick="saveMilestone()">Save Milestone</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="overlay" id="overlay-settings" onclick="if(event.target===this)closeModal('overlay-settings')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">⚙️ Settings</div>
+      <button class="sheet-close" onclick="closeModal('overlay-settings')">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="section-label" style="margin-top:0;">Profile</div>
+      <div id="settings-baby-info"></div>
+      <div class="section-label mt-12">Data</div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Export Backup</div>
+          <div class="settings-sub">Download all data as JSON</div>
+        </div>
+        <button class="btn-sm teal" onclick="exportData()">Export</button>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Import Backup</div>
+          <div class="settings-sub">Restore from a JSON backup</div>
+        </div>
+        <button class="btn-sm" onclick="importData()">Import</button>
+      </div>
+      <div class="settings-row" style="border:none;">
+        <div>
+          <div class="settings-label" style="color:var(--medicine);">Clear All Data</div>
+          <div class="settings-sub">Wipe everything for all profiles</div>
+        </div>
+        <button class="btn-sm" style="color:var(--medicine);border-color:rgba(239,68,68,0.3);" onclick="clearAllData()">Clear</button>
+      </div>
+      <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="handleImportFile(event)">
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  JAVASCRIPT                                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ���─ Constants ──────────────────────────────────────────────
+const EMOJIS = ['🍼','👶','🌱','🦊','🐻','🐼','🦁','🐨','🐸','🐧','🦋','🌸','⭐','🌈','🚀','🦄','🐝','🌺','🐰','🦔','🐳','🎀'];
+
+const EVENT_META = {
+  feed:        { label: 'Feed',        icon: '🍼', color: 'var(--feed)',      bg: 'rgba(245,158,11,0.15)'  },
+  diaper:      { label: 'Diaper',      icon: '🩲', color: 'var(--diaper)',    bg: 'rgba(168,85,247,0.15)'  },
+  potty:       { label: 'Potty',       icon: '🚽', color: 'var(--potty)',     bg: 'rgba(139,92,246,0.15)'  },
+  sleep:       { label: 'Sleep',       icon: '💤', color: 'var(--sleep)',     bg: 'rgba(59,130,246,0.15)'  },
+  burp:        { label: 'Burp',        icon: '👋', color: 'var(--burp)',      bg: 'rgba(34,197,94,0.15)'   },
+  meal:        { label: 'Meal',        icon: '🍽️', color: 'var(--meal)',      bg: 'rgba(249,115,22,0.15)'  },
+  activity:    { label: 'Activity',    icon: '⚽', color: 'var(--activity)',  bg: 'rgba(6,182,212,0.15)'   },
+  mood:        { label: 'Mood',        icon: '😊', color: 'var(--mood)',      bg: 'rgba(236,72,153,0.15)'  },
+  medicine:    { label: 'Medicine',    icon: '💊', color: 'var(--medicine)',  bg: 'rgba(239,68,68,0.15)'   },
+  temperature: { label: 'Temp',        icon: '🌡️', color: 'var(--temp)',     bg: 'rgba(244,63,94,0.15)'   },
+  growth:      { label: 'Growth',      icon: '📏', color: 'var(--growth)',    bg: 'rgba(132,204,22,0.15)'  },
+  milestone:   { label: 'Milestone',   icon: '⭐', color: 'var(--milestone)', bg: 'rgba(234,179,8,0.15)'   },
+};
+
+// ── State ──────────────────────────────────────────────────
+let state = {
+  babies: [],
+  activeBabyId: null,
+  events: [],
+};
+
+// ── localStorage ───────────────────────────────────────────
+function save() {
+  localStorage.setItem('nestly_state', JSON.stringify(state));
+}
+function load() {
+  try {
+    const raw = localStorage.getItem('nestly_state');
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  if (!state.babies) state.babies = [];
+  if (!state.events) state.events = [];
+  if (!state.activeBabyId && state.babies.length) state.activeBabyId = state.babies[0].id;
+}
+
+// ── Utilities ──────────────────────────────────────────────
+function uuid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function formatAgo(isoStr) {
+  if (!isoStr) return '–';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  if (diff < 0) return 'just now';
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m ago` : `${h}h ago`;
+}
+
+function formatDuration(ms) {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h > 0) return `${h}h ${rm}m`;
+  return `${m}m`;
+}
+
+function formatTimerHMS(ms) {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000) % 60;
+  const m = Math.floor(ms / 60000) % 60;
+  const h = Math.floor(ms / 3600000);
+  const pad = n => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDate(isoStr) {
+  const d = new Date(isoStr);
+  const today = new Date();
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function getAgeMonths(dob) {
+  if (!dob) return 0;
+  const d = new Date(dob);
+  const now = new Date();
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+}
+
+function formatAge(dob) {
+  const months = getAgeMonths(dob);
+  if (months < 1) {
+    const days = Math.floor((Date.now() - new Date(dob).getTime()) / 86400000);
+    return `${days} days old`;
+  }
+  if (months < 24) return `${months} months old`;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return m > 0 ? `${y}y ${m}mo old` : `${y} years old`;
+}
+
+function getBabyMode(baby) {
+  if (!baby) return 'baby';
+  if (baby.mode === 'baby') return 'baby';
+  if (baby.mode === 'toddler') return 'toddler';
+  // auto: >= 18 months = toddler
+  return getAgeMonths(baby.dob) >= 18 ? 'toddler' : 'baby';
+}
+
+function getActiveBaby() {
+  return state.babies.find(b => b.id === state.activeBabyId) || state.babies[0] || null;
+}
+
+function getBabyEvents(babyId, days) {
+  const cutoff = days ? Date.now() - days * 86400000 : 0;
+  return state.events
+    .filter(e => e.babyId === babyId && new Date(e.timestamp).getTime() >= cutoff)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function getLastEvent(babyId, type) {
+  return state.events
+    .filter(e => e.babyId === babyId && e.type === type)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0] || null;
+}
+
+function todayEvents(babyId) {
+  const start = new Date(); start.setHours(0,0,0,0);
+  return state.events.filter(e => e.babyId === babyId && new Date(e.timestamp) >= start);
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'timeline') renderTimeline();
+  if (name === 'stats') renderStats();
+  if (name === 'home') renderHome();
+  if (name === 'log') renderLogTab();
+}
+
+// ── App init ───────────────────────────────────────────────
+function initApp() {
+  load();
+  if (state.babies.length === 0) {
+    document.getElementById('welcome').classList.add('visible');
+    return;
+  }
+  showMainUI();
+}
+
+function showMainUI() {
+  document.getElementById('welcome').classList.remove('visible');
+  document.getElementById('main-ui').style.display = 'flex';
+  renderTodayBar();
+  renderHeader();
+  renderHome();
+  renderLogTab();
+  startLiveUpdates();
+}
+
+// ── Header ─────────────────────────────────────────────────
+function renderHeader() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  document.getElementById('hdr-avatar').textContent = baby.emoji || '🍼';
+  document.getElementById('hdr-name').textContent = baby.name || 'Baby';
+  document.getElementById('hdr-age').textContent = formatAge(baby.dob);
+}
+
+// ── Baby Drawer ────────────────────────────────────────────
+function openBabyDrawer() {
+  const list = document.getElementById('baby-drawer-list');
+  list.innerHTML = state.babies.map(b => {
+    const mode = getBabyMode(b);
+    const active = b.id === state.activeBabyId;
+    return `<div class="drawer-item" onclick="setActiveBaby('${b.id}')">
+      <div class="drawer-avatar ${active ? 'active' : ''}">${b.emoji || '🍼'}</div>
+      <div class="drawer-info">
+        <div class="drawer-name">${b.name}</div>
+        <div class="drawer-meta">${formatAge(b.dob)}</div>
+      </div>
+      <span class="drawer-mode-badge ${mode}">${mode === 'baby' ? 'Baby' : 'Toddler'}</span>
+      <button class="drawer-edit" onclick="event.stopPropagation();closeBabyDrawer();openAddBabyModal('${b.id}')">✏️</button>
+    </div>`;
+  }).join('') + `<div class="drawer-add" onclick="closeBabyDrawer();openAddBabyModal()">
+    <span style="font-size:20px;">＋</span> Add Baby
+  </div>`;
+  document.getElementById('overlay-babies').classList.add('open');
+}
+
+function closeBabyDrawer() {
+  document.getElementById('overlay-babies').classList.remove('open');
+}
+
+function setActiveBaby(id) {
+  state.activeBabyId = id;
+  save();
+  closeBabyDrawer();
+  renderHeader();
+  renderHome();
+  renderLogTab();
+}
+
+// ── Add / Edit Baby ────────────────────────────────────────
+let selectedEmoji = EMOJIS[0];
+let selectedBabyMode = 'auto';
+
+function openAddBabyModal(editId) {
+  const baby = editId ? state.babies.find(b => b.id === editId) : null;
+  document.getElementById('add-baby-title').textContent = baby ? 'Edit Profile' : 'Add Baby';
+  document.getElementById('baby-name-input').value = baby ? baby.name : '';
+  document.getElementById('baby-dob-input').value = baby ? baby.dob : '';
+  document.getElementById('baby-edit-id').value = editId || '';
+  document.getElementById('baby-delete-btn').style.display = editId ? 'block' : 'none';
+  document.getElementById('baby-potty-toggle').checked = baby ? !!baby.pottyMode : false;
+
+  selectedEmoji = baby ? (baby.emoji || EMOJIS[0]) : EMOJIS[0];
+  selectedBabyMode = baby ? (baby.mode || 'auto') : 'auto';
+
+  // Emoji grid
+  const grid = document.getElementById('baby-emoji-grid');
+  grid.innerHTML = EMOJIS.map(e =>
+    `<div class="emoji-opt ${e === selectedEmoji ? 'selected' : ''}" onclick="selectEmoji('${e}')">${e}</div>`
+  ).join('');
+
+  // Mode seg
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === selectedBabyMode);
+  });
+
+  document.getElementById('overlay-add-baby').classList.add('open');
+}
+
+function selectEmoji(e) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-opt').forEach(el => {
+    el.classList.toggle('selected', el.textContent === e);
+  });
+}
+
+function selectBabyMode(m) {
+  selectedBabyMode = m;
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === m);
+  });
+}
+
+function saveBaby() {
+  const name = document.getElementById('baby-name-input').value.trim();
+  const dob = document.getElementById('baby-dob-input').value;
+  if (!name) { alert('Please enter a name.'); return; }
+  const editId = document.getElementById('baby-edit-id').value;
+  const pottyMode = document.getElementById('baby-potty-toggle').checked;
+
+  if (editId) {
+    const baby = state.babies.find(b => b.id === editId);
+    if (baby) { baby.name = name; baby.dob = dob; baby.emoji = selectedEmoji; baby.mode = selectedBabyMode; baby.pottyMode = pottyMode; }
+  } else {
+    const baby = { id: uuid(), name, dob, emoji: selectedEmoji, mode: selectedBabyMode, pottyMode };
+    state.babies.push(baby);
+    state.activeBabyId = baby.id;
+  }
+  save();
+  closeModal('overlay-add-baby');
+  showMainUI();
+  renderHeader();
+  renderHome();
+  renderLogTab();
+}
+
+function deleteBabyConfirm() {
+  const id = document.getElementById('baby-edit-id').value;
+  const baby = state.babies.find(b => b.id === id);
+  if (!baby) return;
+  if (!confirm(`Delete all data for ${baby.name}? This cannot be undone.`)) return;
+  state.babies = state.babies.filter(b => b.id !== id);
+  state.events = state.events.filter(e => e.babyId !== id);
+  if (state.activeBabyId === id) state.activeBabyId = state.babies[0]?.id || null;
+  save();
+  closeModal('overlay-add-baby');
+  if (!state.activeBabyId) {
+    document.getElementById('main-ui').style.display = 'none';
+    document.getElementById('welcome').classList.add('visible');
+  } else {
+    renderHeader();
+    renderHome();
+    renderLogTab();
+  }
+}
+
+// ── Home Dashboard ─────────────────────────────────────────
+function renderHome() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const mode = getBabyMode(baby);
+  const usePotty = baby.pottyMode;
+  const today = todayEvents(baby.id);
+
+  // Sleep banner
+  renderSleepBanner(baby);
+
+  // Stat cards
+  const grid = document.getElementById('home-stat-grid');
+  const cards = [];
+
+  if (mode === 'baby') {
+    const lastFeed = getLastEvent(baby.id, 'feed');
+    const lastDiaper = getLastEvent(baby.id, usePotty ? 'potty' : 'diaper');
+    const lastBurp = getLastEvent(baby.id, 'burp');
+    const lastSleep = state.events.filter(e => e.babyId === baby.id && e.type === 'sleep' && e.endTimestamp)
+      .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+    cards.push({ type:'feed', label:'Last Feed', value: formatAgo(lastFeed?.timestamp), sub: lastFeed ? descFeed(lastFeed) : '' });
+    cards.push({ type: usePotty ? 'potty' : 'diaper', label: usePotty ? 'Last Potty' : 'Last Diaper', value: formatAgo(lastDiaper?.timestamp), sub: lastDiaper ? (lastDiaper.data?.diaperType || lastDiaper.data?.pottyType || '') : '' });
+    cards.push({ type:'sleep', label:'Last Sleep', value: lastSleep ? formatAgo(lastSleep.timestamp) : '–', sub: lastSleep ? formatDuration(new Date(lastSleep.endTimestamp) - new Date(lastSleep.timestamp)) : '' });
+    cards.push({ type:'burp', label:'Last Burp', value: formatAgo(lastBurp?.timestamp), sub: '' });
+  } else {
+    const lastMeal = getLastEvent(baby.id, 'meal');
+    const lastPotty = getLastEvent(baby.id, usePotty ? 'potty' : 'diaper');
+    const lastActivity = getLastEvent(baby.id, 'activity');
+    const lastSleep = state.events.filter(e => e.babyId === baby.id && e.type === 'sleep' && e.endTimestamp)
+      .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+    cards.push({ type:'meal', label:'Last Meal', value: formatAgo(lastMeal?.timestamp), sub: lastMeal ? (lastMeal.data?.mealType || '') : '' });
+    cards.push({ type: usePotty ? 'potty' : 'diaper', label: usePotty ? 'Last Potty' : 'Last Diaper', value: formatAgo(lastPotty?.timestamp), sub: '' });
+    cards.push({ type:'sleep', label:'Last Sleep', value: lastSleep ? formatAgo(lastSleep.timestamp) : '–', sub: lastSleep ? formatDuration(new Date(lastSleep.endTimestamp) - new Date(lastSleep.timestamp)) : '' });
+    cards.push({ type:'activity', label:'Last Activity', value: formatAgo(lastActivity?.timestamp), sub: lastActivity ? (lastActivity.data?.activityType || '') : '' });
+  }
+
+  const MODAL_MAP = { feed:'overlay-feed', diaper:'overlay-diaper', potty:'overlay-potty', sleep:'overlay-sleep-type', burp:null, meal:'overlay-meal', activity:'overlay-activity' };
+  const GRADIENTS = { feed:'linear-gradient(135deg,rgba(251,191,36,0.2),rgba(120,53,15,0.15))', diaper:'linear-gradient(135deg,rgba(192,132,252,0.2),rgba(88,28,135,0.15))', potty:'linear-gradient(135deg,rgba(167,139,250,0.2),rgba(76,29,149,0.15))', sleep:'linear-gradient(135deg,rgba(96,165,250,0.2),rgba(29,78,216,0.15))', burp:'linear-gradient(135deg,rgba(52,211,153,0.2),rgba(6,78,59,0.15))', meal:'linear-gradient(135deg,rgba(251,146,60,0.2),rgba(124,45,18,0.15))', activity:'linear-gradient(135deg,rgba(56,189,248,0.2),rgba(12,74,110,0.15))' };
+  grid.innerHTML = cards.map(c => {
+    const m = EVENT_META[c.type];
+    const action = c.type === 'burp' ? 'logBurp()' : c.type === 'sleep' && baby.activeSleepStart ? 'stopSleep()' : MODAL_MAP[c.type] ? `openModal('${MODAL_MAP[c.type]}')` : '';
+    return `<div class="stat-card" style="background:${GRADIENTS[c.type]||'var(--surface)'};" onclick="${action}">
+      <div class="stat-card-glow" style="background:${m.color}"></div>
+      <div class="stat-card-icon">${m.icon}</div>
+      <div class="stat-card-label" style="color:${m.color};opacity:0.85;">${c.label}</div>
+      <div class="stat-card-value">${c.value}</div>
+      ${c.sub ? `<div class="stat-card-sub">${c.sub}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Today's totals
+  renderTotals(baby, today, mode);
+
+  // Health & Milestones mini-cards
+  renderHealthGrid(baby);
+
+  // Streak (toddler)
+  renderStreak(baby, mode);
+}
+
+function renderSleepBanner(baby) {
+  const banner = document.getElementById('home-sleep-banner');
+  if (baby.activeSleepStart) {
+    const elapsed = Date.now() - new Date(baby.activeSleepStart).getTime();
+    const typeLabel = baby.activeSleepType === 'night' ? '🌙 Night Sleep' : '🌤️ Nap';
+    banner.innerHTML = `<div class="sleep-banner">
+      <div class="sleep-banner-left">
+        <div class="sleep-banner-icon">😴</div>
+        <div>
+          <div class="sleep-banner-label">${typeLabel}</div>
+          <div class="sleep-banner-time" id="home-sleep-timer">${formatTimerHMS(elapsed)}</div>
+        </div>
+      </div>
+      <button class="pill active" onclick="stopSleep()">■ Stop</button>
+    </div>`;
+  } else {
+    banner.innerHTML = '';
+  }
+}
+
+function renderTotals(baby, today, mode) {
+  const el = document.getElementById('home-totals');
+  if (mode === 'baby') {
+    const oz = today.filter(e => e.type === 'feed' && e.data?.oz).reduce((s,e) => s + (e.data.oz || 0), 0);
+    const diapers = today.filter(e => e.type === (baby.pottyMode ? 'potty' : 'diaper')).length;
+    const sleepMs = today.filter(e => e.type === 'sleep' && e.endTimestamp)
+      .reduce((s,e) => s + (new Date(e.endTimestamp) - new Date(e.timestamp)), 0);
+    const feeds = today.filter(e => e.type === 'feed').length;
+    el.innerHTML = `<div class="totals-card">
+      <div class="card-title">Today</div>
+      <div class="totals-row">
+        <div class="total-item"><div class="total-value" style="color:var(--feed)">${oz > 0 ? oz.toFixed(1) + ' oz' : feeds + ' feeds'}</div><div class="total-label">${oz > 0 ? 'Fed' : 'Feeds'}</div></div>
+        <div class="total-item"><div class="total-value" style="color:var(--diaper)">${diapers}</div><div class="total-label">${baby.pottyMode ? 'Potty' : 'Diapers'}</div></div>
+        <div class="total-item"><div class="total-value" style="color:var(--sleep)">${formatDuration(sleepMs) || '–'}</div><div class="total-label">Sleep</div></div>
+      </div>
+    </div>`;
+  } else {
+    const meals = today.filter(e => e.type === 'meal').length;
+    const potty = today.filter(e => e.type === (baby.pottyMode ? 'potty' : 'diaper')).length;
+    const sleepMs = today.filter(e => e.type === 'sleep' && e.endTimestamp)
+      .reduce((s,e) => s + (new Date(e.endTimestamp) - new Date(e.timestamp)), 0);
+    el.innerHTML = `<div class="totals-card">
+      <div class="card-title">Today</div>
+      <div class="totals-row">
+        <div class="total-item"><div class="total-value" style="color:var(--meal)">${meals}</div><div class="total-label">Meals</div></div>
+        <div class="total-item"><div class="total-value" style="color:var(--potty)">${potty}</div><div class="total-label">${baby.pottyMode ? 'Potty' : 'Diapers'}</div></div>
+        <div class="total-item"><div class="total-value" style="color:var(--sleep)">${formatDuration(sleepMs) || '–'}</div><div class="total-label">Sleep</div></div>
+      </div>
+    </div>`;
+  }
+}
+
+function renderStreak(baby, mode) {
+  const el = document.getElementById('home-streak');
+  if (mode !== 'toddler' || !baby.pottyMode) { el.innerHTML = ''; return; }
+  // Count consecutive days without a potty accident
+  let streak = 0;
+  const d = new Date(); d.setHours(0,0,0,0);
+  for (let i = 0; i < 30; i++) {
+    const dayStart = new Date(d); dayStart.setDate(d.getDate() - i);
+    const dayEnd = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+    const accident = state.events.find(e =>
+      e.babyId === baby.id && e.type === 'potty' &&
+      e.data?.pottyType === 'accident' &&
+      new Date(e.timestamp) >= dayStart && new Date(e.timestamp) <= dayEnd
+    );
+    if (i === 0 && accident) break;
+    if (i > 0 && accident) break;
+    if (i > 0) streak++;
+    if (i === 0 && !accident) streak = 1;
+  }
+  if (streak < 2) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="streak-banner">
+    <div class="streak-icon">🎉</div>
+    <div>
+      <div class="streak-label">Potty Streak</div>
+      <div class="streak-value">${streak} days accident-free!</div>
+    </div>
+  </div>`;
+}
+
+function descFeed(e) {
+  if (!e) return '';
+  const t = e.data?.feedType;
+  if (t === 'bottle' || t === 'mixed') return (e.data?.oz || 0).toFixed(1) + ' oz';
+  if (t === 'breast') return 'Breast' + (e.data?.side ? ' · ' + e.data.side : '');
+  return '';
+}
+
+// ── Live updates ───────────────────────────────────────────
+let liveTimerInterval = null;
+let liveRefreshInterval = null;
+
+function startLiveUpdates() {
+  if (liveTimerInterval) clearInterval(liveTimerInterval);
+  if (liveRefreshInterval) clearInterval(liveRefreshInterval);
+
+  // Every second: update sleep timer displays only
+  liveTimerInterval = setInterval(() => {
+    const baby = getActiveBaby();
+    if (!baby?.activeSleepStart) return;
+    const elapsed = Date.now() - new Date(baby.activeSleepStart).getTime();
+    const formatted = formatTimerHMS(elapsed);
+    const homeEl = document.getElementById('home-sleep-timer');
+    if (homeEl) homeEl.textContent = formatted;
+    const logEl = document.getElementById('log-sleep-elapsed');
+    if (logEl) logEl.textContent = formatted;
+  }, 1000);
+
+  // Every 30 seconds: refresh "X ago" countdowns on home tab
+  liveRefreshInterval = setInterval(() => {
+    const tab = document.getElementById('tab-home');
+    if (tab && tab.classList.contains('active')) renderHome();
+  }, 30000);
+}
+
+// ── Log Tab ────────────────────────────────────────────────
+function renderLogTab() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const mode = getBabyMode(baby);
+  const isSleeping = !!baby.activeSleepStart;
+
+  // Sleep toggle (full width)
+  const sleepEl = document.getElementById('log-sleep-toggle');
+  if (isSleeping) {
+    const elapsed = Date.now() - new Date(baby.activeSleepStart).getTime();
+    const typeLabel = baby.activeSleepType === 'night' ? '🌙 Night Sleep' : '🌤️ Nap';
+    sleepEl.innerHTML = `<div class="sleep-toggle-btn active" onclick="stopSleep()">
+      <div class="sleep-toggle-left">
+        <div class="sleep-toggle-icon">💤</div>
+        <div>
+          <div class="sleep-toggle-label">Sleeping <span id="log-sleep-elapsed" class="inline-timer">${formatTimerHMS(elapsed)}</span></div>
+          <div class="sleep-toggle-sub">${typeLabel} · tap to stop</div>
+        </div>
+      </div>
+      <span class="pill active">■ Stop</span>
+    </div>`;
+  } else {
+    sleepEl.innerHTML = `<div class="sleep-toggle-btn" onclick="openSleepModal()">
+      <div class="sleep-toggle-left">
+        <div class="sleep-toggle-icon">💤</div>
+        <div>
+          <div class="sleep-toggle-label">Sleep</div>
+          <div class="sleep-toggle-sub">Tap to start tracking</div>
+        </div>
+      </div>
+      <span class="pill nap">+ Start</span>
+    </div>`;
+  }
+
+  // Primary grid
+  const primaryEl = document.getElementById('log-grid-primary');
+  if (mode === 'baby') {
+    document.getElementById('log-section-primary').textContent = 'Baby';
+    const diaperType = baby.pottyMode ? 'potty' : 'diaper';
+    primaryEl.innerHTML = `
+      ${logBtnHTML('feed', '🍼', 'Feed', 'Bottle · Breast · Mixed', 'openModal(\'overlay-feed\')')}
+      ${logBtnHTML(diaperType, diaperType === 'potty' ? '🚽' : '🩲', diaperType === 'potty' ? 'Potty' : 'Diaper', '', `openModal('overlay-${diaperType}')`)}
+      ${logBtnHTML('burp', '👋', 'Burp', 'Quick tap', 'logBurp()')}
+      ${logBtnHTML('mood', '😊', 'Mood', '', "openModal('overlay-mood')")}
+    `;
+  } else {
+    document.getElementById('log-section-primary').textContent = 'Toddler';
+    const diaperType = baby.pottyMode ? 'potty' : 'diaper';
+    primaryEl.innerHTML = `
+      ${logBtnHTML('meal', '🍽️', 'Meal', 'Brekkie · Lunch · Dinner', "openModal('overlay-meal')")}
+      ${logBtnHTML(diaperType, diaperType === 'potty' ? '🚽' : '🩲', diaperType === 'potty' ? 'Potty' : 'Diaper', '', `openModal('overlay-${diaperType}')`)}
+      ${logBtnHTML('activity', '⚽', 'Activity', 'Outside · Play · Screen', "openModal('overlay-activity')")}
+      ${logBtnHTML('mood', '😊', 'Mood', '', "openModal('overlay-mood')")}
+    `;
+  }
+
+  // Extra grid
+  document.getElementById('log-grid-extra').innerHTML = `
+    ${logBtnHTML('medicine', '💊', 'Medicine', '', "openModal('overlay-medicine')")}
+    ${logBtnHTML('temperature', '🌡️', 'Temp', '', "openModal('overlay-temp')")}
+    ${logBtnHTML('growth', '📏', 'Growth', '', "openModal('overlay-growth')")}
+    ${logBtnHTML('milestone', '⭐', 'Milestone', '', "openModal('overlay-milestone')")}
+  `;
+}
+
+function logBtnHTML(type, icon, label, sub, onclick) {
+  const m = EVENT_META[type] || {};
+  const bar = m.color ? `<div class="log-btn-bar" style="background:${m.color}"></div>` : '';
+  return `<div class="log-btn" onclick="${onclick}">
+    <div class="log-btn-icon">${icon}</div>
+    <div class="log-btn-label">${label}</div>
+    ${sub ? `<div class="log-btn-sub">${sub}</div>` : ''}
+    ${bar}
+  </div>`;
+}
+
+// ── Modal helpers ──────────────────────────────────────────
+function openModal(id) {
+  if (!editingEventId) {
+    document.querySelectorAll(`#${id} input[type="datetime-local"]`).forEach(el => {
+      el.value = nowDTL();
+    });
+  }
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function closeAllModals() {
+  document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+}
+
+// ── Log event ──────────────────────────────────────────────
+function logEvent(type, data = {}) {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const ev = { id: uuid(), babyId: baby.id, type, timestamp: new Date().toISOString(), data };
+  state.events.push(ev);
+  save();
+  renderHome();
+  renderLogTab();
+  const timelineTab = document.getElementById('tab-timeline');
+  if (timelineTab.classList.contains('active')) renderTimeline();
+  return ev;
+}
+
+// ── Feed Modal ─────────────────────────────────────────────
+let feedType = 'bottle';
+let formulaType = 'formula';
+let breastSide = 'L';
+let ozVal = 3.0;
+let breastTimerStart = null;
+let breastTimerInterval = null;
+
+function stepOz(delta) {
+  ozVal = Math.max(0, Math.min(16, ozVal + delta));
+  document.getElementById('oz-display').textContent = ozVal.toFixed(1);
+}
+
+function selectFeedType(t) {
+  feedType = t;
+  document.querySelectorAll('[data-feed]').forEach(b => b.classList.toggle('active', b.dataset.feed === t));
+  document.getElementById('feed-oz-section').style.display = (t === 'breast') ? 'none' : 'block';
+  document.getElementById('feed-breast-section').style.display = (t === 'breast') ? 'block' : 'none';
+  document.getElementById('feed-formula-row').style.display = (t === 'bottle') ? 'block' : 'none';
+}
+
+function selectFormulaType(t) {
+  formulaType = t;
+  document.querySelectorAll('[data-formula]').forEach(b => b.classList.toggle('active', b.dataset.formula === t));
+}
+
+function selectBreastSide(s) {
+  breastSide = s;
+  document.querySelectorAll('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === s));
+}
+
+function toggleBreastTimer() {
+  if (breastTimerStart) {
+    clearInterval(breastTimerInterval);
+    breastTimerStart = null;
+    document.getElementById('breast-timer-btn').textContent = '▶ Start Timer';
+    document.getElementById('breast-timer-label').textContent = 'Tap to start timer';
+  } else {
+    breastTimerStart = Date.now();
+    document.getElementById('breast-timer-btn').textContent = '⏹ Stop Timer';
+    breastTimerInterval = setInterval(() => {
+      document.getElementById('breast-timer-num').textContent = formatTimerHMS(Date.now() - breastTimerStart);
+    }, 1000);
+  }
+}
+
+function saveFeed() {
+  const note = document.getElementById('feed-note').value.trim();
+  let data = { feedType };
+  if (feedType === 'bottle') { data.oz = ozVal; data.formulaType = formulaType; }
+  else if (feedType === 'mixed') { data.oz = ozVal; }
+  else if (feedType === 'breast') {
+    data.side = breastSide;
+    if (breastTimerStart) { data.duration_min = Math.round((Date.now() - breastTimerStart) / 60000); clearInterval(breastTimerInterval); breastTimerStart = null; }
+  }
+  if (note) data.note = note;
+  saveOrUpdate('feed', data, 'feed-datetime');
+  document.getElementById('feed-note').value = '';
+  resetEditMode('overlay-feed', '🍼 Feed', 'feed-save-btn', 'Save Feed');
+  closeModal('overlay-feed');
+}
+
+// ── Diaper Modal ───────────────────────────────────────────
+let diaperType = 'wet';
+
+function selectDiaperType(t) {
+  diaperType = t;
+  document.querySelectorAll('[data-diaper]').forEach(b => b.classList.toggle('selected', b.dataset.diaper === t));
+}
+
+function saveDiaper() {
+  const note = document.getElementById('diaper-note').value.trim();
+  saveOrUpdate('diaper', { diaperType, note: note || undefined }, 'diaper-datetime');
+  document.getElementById('diaper-note').value = '';
+  diaperType = 'wet';
+  document.querySelectorAll('[data-diaper]').forEach(b => b.classList.toggle('selected', b.dataset.diaper === 'wet'));
+  resetEditMode('overlay-diaper', '🩲 Diaper', 'diaper-save-btn', 'Save Diaper');
+  closeModal('overlay-diaper');
+}
+
+// ── Potty Modal ────────────────────────────────────────────
+let pottyType = 'pee';
+
+function selectPottyType(t) {
+  pottyType = t;
+  document.querySelectorAll('[data-potty]').forEach(b => b.classList.toggle('selected', b.dataset.potty === t));
+}
+
+function savePotty() {
+  const note = document.getElementById('potty-note').value.trim();
+  saveOrUpdate('potty', { pottyType, note: note || undefined }, 'potty-datetime');
+  document.getElementById('potty-note').value = '';
+  pottyType = 'pee';
+  document.querySelectorAll('[data-potty]').forEach(b => b.classList.toggle('selected', b.dataset.potty === 'pee'));
+  resetEditMode('overlay-potty', '🚽 Potty', 'potty-save-btn', 'Save Potty');
+  closeModal('overlay-potty');
+}
+
+// ── Sleep ──────────────────────────────────────────────────
+let pendingSleepType = 'nap';
+
+function openSleepModal() {
+  pendingSleepType = 'nap';
+  document.querySelectorAll('[data-sleep]').forEach(b => b.classList.toggle('selected', b.dataset.sleep === 'nap'));
+  openModal('overlay-sleep-type');
+}
+
+function selectSleepType(t) {
+  pendingSleepType = t;
+  document.querySelectorAll('[data-sleep]').forEach(b => b.classList.toggle('selected', b.dataset.sleep === t));
+}
+
+function confirmStartSleep() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const startVal = document.getElementById('sleep-start-time').value;
+  baby.activeSleepStart = dtlToISO(startVal || nowDTL());
+  baby.activeSleepType = pendingSleepType;
+  save();
+  closeModal('overlay-sleep-type');
+  renderHome();
+  renderLogTab();
+}
+
+function stopSleep() {
+  const baby = getActiveBaby();
+  if (!baby || !baby.activeSleepStart) return;
+  // Open overlay directly — bypass openModal() to preserve custom times
+  document.getElementById('overlay-sleep-stop').classList.add('open');
+  document.getElementById('sleep-stop-start').value = isoToDTL(baby.activeSleepStart);
+  document.getElementById('sleep-stop-end').value = nowDTL();
+  updateSleepStopDuration();
+  document.getElementById('sleep-stop-start').oninput = updateSleepStopDuration;
+  document.getElementById('sleep-stop-end').oninput = updateSleepStopDuration;
+}
+
+function updateSleepStopDuration() {
+  const s = document.getElementById('sleep-stop-start').value;
+  const e = document.getElementById('sleep-stop-end').value;
+  if (s && e) {
+    const ms = new Date(e) - new Date(s);
+    document.getElementById('sleep-stop-duration').textContent = ms > 0 ? `Duration: ${formatDuration(ms)}` : 'End must be after start';
+  }
+}
+
+function confirmStopSleep() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const startISO = dtlToISO(document.getElementById('sleep-stop-start').value);
+  const endISO = dtlToISO(document.getElementById('sleep-stop-end').value);
+  if (new Date(endISO) <= new Date(startISO)) { showToast('⚠️ End must be after start'); return; }
+  const duration = formatDuration(new Date(endISO) - new Date(startISO));
+  state.events.push({ id: uuid(), babyId: baby.id, type: 'sleep', timestamp: startISO, endTimestamp: endISO, data: { sleepType: baby.activeSleepType || 'nap' } });
+  baby.activeSleepStart = null;
+  baby.activeSleepType = null;
+  save();
+  closeModal('overlay-sleep-stop');
+  renderHome();
+  renderLogTab();
+  showToast(`💤 Sleep logged · ${duration}`);
+}
+
+// ── Toast ──────────────────────────────────────────────────
+function showToast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+// ── Burp ───────────────────────────────────────────────────
+function logBurp() {
+  logEvent('burp', {});
+  showToast('👋 Burp logged!');
+}
+
+// ── Meal Modal ─────────────────────────────────────────────
+let mealType = 'breakfast';
+let mealQuality = 'well';
+
+function selectMealType(t) {
+  mealType = t;
+  document.querySelectorAll('[data-meal]').forEach(b => b.classList.toggle('active', b.dataset.meal === t));
+}
+
+function selectMealQuality(q) {
+  mealQuality = q;
+  document.querySelectorAll('[data-quality]').forEach(b => b.classList.toggle('selected', b.dataset.quality === q));
+}
+
+function saveMeal() {
+  const food = document.getElementById('meal-food').value.trim();
+  saveOrUpdate('meal', { mealType, mealQuality, food: food || undefined }, 'meal-datetime');
+  document.getElementById('meal-food').value = '';
+  mealType = 'breakfast'; mealQuality = 'well';
+  resetEditMode('overlay-meal', '🍽️ Meal', 'meal-save-btn', 'Save Meal');
+  closeModal('overlay-meal');
+}
+
+// ── Activity Modal ─────────────────────────────────────────
+let activityType = 'outside';
+
+function selectActivityType(t) {
+  activityType = t;
+  document.querySelectorAll('[data-activity]').forEach(b => b.classList.toggle('selected', b.dataset.activity === t));
+}
+
+function saveActivity() {
+  const dur = parseInt(document.getElementById('activity-duration').value) || null;
+  saveOrUpdate('activity', { activityType, duration_min: dur || undefined }, 'activity-datetime');
+  document.getElementById('activity-duration').value = '';
+  activityType = 'outside';
+  resetEditMode('overlay-activity', '⚽ Activity', 'activity-save-btn', 'Save Activity');
+  closeModal('overlay-activity');
+}
+
+// ── Mood Modal ─────────────────────────────────────────────
+let moodVal = 5;
+
+function selectMood(v) {
+  moodVal = v;
+  document.querySelectorAll('[data-mood]').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.mood) === v));
+}
+
+function saveMood() {
+  const note = document.getElementById('mood-note').value.trim();
+  saveOrUpdate('mood', { mood: moodVal, note: note || undefined }, 'mood-datetime');
+  document.getElementById('mood-note').value = '';
+  moodVal = 5;
+  resetEditMode('overlay-mood', '😊 Mood', 'mood-save-btn', 'Save Mood');
+  closeModal('overlay-mood');
+}
+
+// ── Medicine Modal ─────────────────────────────────────────
+function saveMedicine() {
+  const name = document.getElementById('medicine-name').value.trim();
+  const dose = document.getElementById('medicine-dose').value.trim();
+  const note = document.getElementById('medicine-note').value.trim();
+  if (!name) { showToast('⚠️ Enter medicine name'); return; }
+  saveOrUpdate('medicine', { name, dose: dose || undefined, note: note || undefined }, 'medicine-datetime');
+  ['medicine-name','medicine-dose','medicine-note'].forEach(id => document.getElementById(id).value = '');
+  resetEditMode('overlay-medicine', '💊 Medicine', 'medicine-save-btn', 'Save');
+  closeModal('overlay-medicine');
+}
+
+// ── Temperature Modal ──────────────────────────────────────
+let tempUnit = 'C';
+
+function selectTempUnit(u) {
+  tempUnit = u;
+  document.querySelectorAll('[data-unit]').forEach(b => b.classList.toggle('active', b.dataset.unit === u));
+}
+
+function saveTemp() {
+  const val = parseFloat(document.getElementById('temp-value').value);
+  const note = document.getElementById('temp-note').value.trim();
+  if (isNaN(val)) { showToast('⚠️ Enter a temperature'); return; }
+  saveOrUpdate('temperature', { value: val, unit: tempUnit, note: note || undefined }, 'temp-datetime');
+  document.getElementById('temp-value').value = '';
+  document.getElementById('temp-note').value = '';
+  resetEditMode('overlay-temp', '🌡️ Temperature', 'temp-save-btn', 'Save');
+  closeModal('overlay-temp');
+}
+
+// ── Growth Modal ───────────────────────────────────────────
+function saveGrowth() {
+  const weight = parseFloat(document.getElementById('growth-weight').value) || null;
+  const height = parseFloat(document.getElementById('growth-height').value) || null;
+  const head = parseFloat(document.getElementById('growth-head').value) || null;
+  if (!weight && !height) { showToast('⚠️ Enter weight or height'); return; }
+  saveOrUpdate('growth', { weightKg: weight || undefined, heightCm: height || undefined, headCm: head || undefined }, 'growth-datetime');
+  ['growth-weight','growth-height','growth-head'].forEach(id => document.getElementById(id).value = '');
+  resetEditMode('overlay-growth', '📏 Growth', 'growth-save-btn', 'Save');
+  closeModal('overlay-growth');
+}
+
+// ── Milestone Modal ────────────────────────────────────────
+function saveMilestone() {
+  const title = document.getElementById('milestone-title').value.trim();
+  const note = document.getElementById('milestone-note').value.trim();
+  if (!title) { showToast('⚠️ Enter a milestone'); return; }
+  saveOrUpdate('milestone', { title, note: note || undefined }, 'milestone-datetime');
+  document.getElementById('milestone-title').value = '';
+  document.getElementById('milestone-note').value = '';
+  resetEditMode('overlay-milestone', '⭐ Milestone', 'milestone-save-btn', 'Save Milestone');
+  closeModal('overlay-milestone');
+}
+
+// ── Timeline ───────────────────────────────────────────────
+let timelineFilter = 'all';
+
+function renderTimeline() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+
+  // Filter chips
+  const filterEl = document.getElementById('timeline-filter');
+  const filters = ['all', 'feed', 'diaper', 'potty', 'sleep', 'meal', 'activity', 'mood', 'medicine', 'temperature', 'growth', 'milestone'];
+  filterEl.innerHTML = filters.filter(f => {
+    if (f === 'all') return true;
+    return state.events.some(e => e.babyId === baby.id && e.type === f);
+  }).map(f => {
+    const m = EVENT_META[f];
+    return `<div class="filter-chip ${timelineFilter === f ? 'active' : ''}" onclick="setTimelineFilter('${f}')">${f === 'all' ? 'All' : (m?.icon + ' ' + m?.label)}</div>`;
+  }).join('');
+
+  // Events
+  let events = getBabyEvents(baby.id, 30);
+  if (timelineFilter !== 'all') events = events.filter(e => e.type === timelineFilter);
+
+  if (!events.length) {
+    document.getElementById('timeline-list').innerHTML = `<div class="timeline-empty">No events yet.<br>Head to Log to get started.</div>`;
+    return;
+  }
+
+  // Group by day
+  const groups = {};
+  events.forEach(e => {
+    const d = new Date(e.timestamp).toDateString();
+    if (!groups[d]) groups[d] = { label: formatDate(e.timestamp), items: [] };
+    groups[d].items.push(e);
+  });
+
+  document.getElementById('timeline-list').innerHTML = Object.values(groups).map(g =>
+    `<div class="timeline-day-label">${g.label}</div>` +
+    g.items.map(e => timelineItemHTML(e)).join('')
+  ).join('');
+}
+
+function setTimelineFilter(f) {
+  timelineFilter = f;
+  renderTimeline();
+}
+
+function timelineItemHTML(e) {
+  const m = EVENT_META[e.type] || { icon: '•', label: e.type, color: 'var(--muted)' };
+  const detail = eventDetail(e);
+  const duration = (e.type === 'sleep' && e.endTimestamp)
+    ? formatDuration(new Date(e.endTimestamp) - new Date(e.timestamp)) : '';
+  return `<div class="timeline-item">
+    <div class="timeline-accent" style="background:${m.color}"></div>
+    <div class="timeline-icon">${m.icon}</div>
+    <div class="timeline-content">
+      <div class="timeline-title">${m.label}${duration ? `<span class="text-muted" style="font-weight:500;font-size:12px;"> · ${duration}</span>` : ''}</div>
+      ${detail ? `<div class="timeline-detail">${detail}</div>` : ''}
+    </div>
+    <div class="timeline-time">${formatTime(e.timestamp)}</div>
+    <div class="timeline-actions">
+      <button class="tl-btn tl-edit" onclick="editEvent('${e.id}')">✏️</button>
+      <button class="tl-btn tl-del" onclick="deleteEvent('${e.id}')">🗑</button>
+    </div>
+  </div>`;
+}
+
+function eventDetail(e) {
+  const d = e.data || {};
+  switch (e.type) {
+    case 'feed':
+      if (d.feedType === 'bottle') return `Bottle · ${(d.oz||0).toFixed(1)} oz · ${d.formulaType || ''}`;
+      if (d.feedType === 'breast') return `Breast · ${d.side || ''}${d.duration_min ? ' · ' + d.duration_min + 'min' : ''}`;
+      if (d.feedType === 'mixed') return `Mixed · ${(d.oz||0).toFixed(1)} oz`;
+      return '';
+    case 'diaper': return d.diaperType || '';
+    case 'potty': return d.pottyType || '';
+    case 'sleep': return d.sleepType || '';
+    case 'meal': return [d.mealType, d.mealQuality, d.food].filter(Boolean).join(' · ');
+    case 'activity': return [d.activityType, d.duration_min ? d.duration_min + 'min' : ''].filter(Boolean).join(' · ');
+    case 'mood': { const labels = ['','Upset','Fussy','Okay','Happy','Great']; return labels[d.mood || 5] + (d.note ? ' · ' + d.note : ''); }
+    case 'medicine': return [d.name, d.dose].filter(Boolean).join(' · ');
+    case 'temperature': return d.value ? `${d.value}°${d.unit || 'C'}${d.note ? ' · ' + d.note : ''}` : '';
+    case 'growth': return [d.weightKg ? d.weightKg + 'kg' : '', d.heightCm ? d.heightCm + 'cm' : ''].filter(Boolean).join(' · ');
+    case 'milestone': return d.title || '';
+    default: return d.note || '';
+  }
+}
+
+function deleteEvent(id) {
+  state.events = state.events.filter(e => e.id !== id);
+  save();
+  renderTimeline();
+  renderHome();
+}
+
+// ── Stats ──────────────────────────────────────────────────
+function renderStats() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const mode = getBabyMode(baby);
+  const el = document.getElementById('stats-content');
+
+  // Build 7-day data
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - i);
+    const dEnd = new Date(d); dEnd.setHours(23,59,59,999);
+    const dayEvs = state.events.filter(e =>
+      e.babyId === baby.id && new Date(e.timestamp) >= d && new Date(e.timestamp) <= dEnd
+    );
+    const dayLabel = i === 0 ? 'Today' : i === 1 ? 'Yest' : d.toLocaleDateString([], { weekday: 'short' });
+    days.push({ label: dayLabel, events: dayEvs, d });
+  }
+
+  let html = '';
+
+  if (mode === 'baby') {
+    // 7-day totals
+    const totalOz = days.reduce((s,d) => s + d.events.filter(e => e.type==='feed' && e.data?.oz).reduce((ss,e) => ss+(e.data.oz||0), 0), 0);
+    const totalDiapers = days.reduce((s,d) => s + d.events.filter(e => e.type === (baby.pottyMode?'potty':'diaper')).length, 0);
+    const totalSleepMs = days.reduce((s,d) => s + d.events.filter(e => e.type==='sleep' && e.endTimestamp).reduce((ss,e) => ss+(new Date(e.endTimestamp)-new Date(e.timestamp)), 0), 0);
+
+    html += `<div class="card-title">Last 7 Days</div>
+    <div class="stats-row">
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--feed)">${totalOz.toFixed(0)}</div><div class="stats-num-label">Total oz</div></div>
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--diaper)">${totalDiapers}</div><div class="stats-num-label">${baby.pottyMode?'Potty':'Diapers'}</div></div>
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--sleep)">${Math.round(totalSleepMs/3600000)}h</div><div class="stats-num-label">Sleep</div></div>
+    </div>`;
+
+    // Oz per day chart
+    const ozData = days.map(d => ({ label: d.label, val: d.events.filter(e => e.type==='feed' && e.data?.oz).reduce((s,e) => s+(e.data.oz||0), 0) }));
+    html += `<div class="card"><div class="card-title">🍼 Oz Per Day</div>${barChart(ozData, 'var(--feed)', 'oz')}</div>`;
+
+    // Sleep chart
+    const sleepData = days.map(d => ({ label: d.label, val: +(d.events.filter(e => e.type==='sleep' && e.endTimestamp).reduce((s,e) => s+(new Date(e.endTimestamp)-new Date(e.timestamp)), 0)/3600000).toFixed(1) }));
+    html += `<div class="card"><div class="card-title">💤 Sleep Hours Per Day</div>${barChart(sleepData, 'var(--sleep)', 'h')}</div>`;
+
+    // Diaper chart
+    const diaperData = days.map(d => ({ label: d.label, val: d.events.filter(e => e.type === (baby.pottyMode?'potty':'diaper')).length }));
+    html += `<div class="card"><div class="card-title">${baby.pottyMode?'🚽 Potty':'🩲 Diapers'} Per Day</div>${barChart(diaperData, 'var(--diaper)', '')}</div>`;
+
+  } else {
+    // Toddler stats
+    const totalMeals = days.reduce((s,d) => s + d.events.filter(e => e.type==='meal').length, 0);
+    const totalPotty = days.reduce((s,d) => s + d.events.filter(e => e.type === (baby.pottyMode?'potty':'diaper')).length, 0);
+    const totalSleepMs = days.reduce((s,d) => s + d.events.filter(e => e.type==='sleep' && e.endTimestamp).reduce((ss,e) => ss+(new Date(e.endTimestamp)-new Date(e.timestamp)), 0), 0);
+
+    html += `<div class="card-title">Last 7 Days</div>
+    <div class="stats-row">
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--meal)">${totalMeals}</div><div class="stats-num-label">Meals</div></div>
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--potty)">${totalPotty}</div><div class="stats-num-label">${baby.pottyMode?'Potty':'Diapers'}</div></div>
+      <div class="stats-num-card"><div class="stats-num" style="color:var(--sleep)">${Math.round(totalSleepMs/3600000)}h</div><div class="stats-num-label">Sleep</div></div>
+    </div>`;
+
+    const mealData = days.map(d => ({ label: d.label, val: d.events.filter(e => e.type==='meal').length }));
+    html += `<div class="card"><div class="card-title">🍽️ Meals Per Day</div>${barChart(mealData, 'var(--meal)', '')}</div>`;
+
+    const sleepData = days.map(d => ({ label: d.label, val: +(d.events.filter(e => e.type==='sleep' && e.endTimestamp).reduce((s,e) => s+(new Date(e.endTimestamp)-new Date(e.timestamp)), 0)/3600000).toFixed(1) }));
+    html += `<div class="card"><div class="card-title">💤 Sleep Hours Per Day</div>${barChart(sleepData, 'var(--sleep)', 'h')}</div>`;
+
+    if (baby.pottyMode) {
+      const pottyData = days.map(d => ({ label: d.label, val: d.events.filter(e => e.type==='potty').length }));
+      html += `<div class="card"><div class="card-title">🚽 Potty Per Day</div>${barChart(pottyData, 'var(--potty)', '')}</div>`;
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function barChart(data, color, unit) {
+  const max = Math.max(...data.map(d => d.val), 1);
+  return '<div class="bar-chart">' + data.map(d => {
+    const pct = (d.val / max * 100).toFixed(0);
+    const label = d.val > 0 ? d.val + unit : '';
+    return `<div class="bar-row">
+      <div class="bar-day">${d.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}">
+        ${label ? `<span class="bar-val">${label}</span>` : ''}
+      </div></div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// ── Datetime helpers ───────────────────────────────────────
+function nowDTL() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + 'T' +
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0');
+}
+function isoToDTL(iso) {
+  if (!iso) return nowDTL();
+  const d = new Date(iso);
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + 'T' +
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0');
+}
+function dtlToISO(val) {
+  if (!val) return new Date().toISOString();
+  return new Date(val).toISOString();
+}
+
+// ── Today bar ──────────────────────────────────────────────
+function renderTodayBar() {
+  const now = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('today-day-label').textContent = days[now.getDay()];
+  document.getElementById('today-date-label').textContent = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// ── Home health section ────────────────────────────────────
+function renderHealthGrid(baby) {
+  const el = document.getElementById('home-health-grid');
+  const types = [
+    { type:'medicine', icon:'💊', label:'Medicine', onclick:"openModal('overlay-medicine')" },
+    { type:'temperature', icon:'🌡️', label:'Temp', onclick:"openModal('overlay-temp')" },
+    { type:'growth', icon:'📏', label:'Growth', onclick:"openModal('overlay-growth')" },
+    { type:'milestone', icon:'⭐', label:'Milestone', onclick:"openModal('overlay-milestone')" },
+  ];
+  el.innerHTML = types.map(t => {
+    const last = getLastEvent(baby.id, t.type);
+    const m = EVENT_META[t.type];
+    let val = last ? formatAgo(last.timestamp) : '–';
+    return `<div class="health-card" onclick="${t.onclick}">
+      <div class="health-card-icon">${t.icon}</div>
+      <div class="health-card-label">${t.label}</div>
+      <div class="health-card-val" style="color:${m.color}">${val}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Edit event ─────────────────────────────────────────────
+let editingEventId = null;
+
+function editEvent(id) {
+  const ev = state.events.find(e => e.id === id);
+  if (!ev) return;
+  editingEventId = id;
+  const d = ev.data || {};
+  const ts = isoToDTL(ev.timestamp);
+
+  switch (ev.type) {
+    case 'feed':
+      feedType = d.feedType || 'bottle';
+      formulaType = d.formulaType || 'formula';
+      breastSide = d.side || 'L';
+      ozVal = d.oz || 3.0;
+      document.getElementById('oz-display').textContent = ozVal.toFixed(1);
+      selectFeedType(feedType);
+      document.getElementById('feed-note').value = d.note || '';
+      document.getElementById('feed-datetime').value = ts;
+      document.getElementById('feed-save-btn').textContent = 'Update Feed';
+      document.querySelector('#overlay-feed .sheet-title').textContent = '🍼 Edit Feed';
+      openModal('overlay-feed'); break;
+
+    case 'diaper':
+      diaperType = d.diaperType || 'wet';
+      document.querySelectorAll('[data-diaper]').forEach(b => b.classList.toggle('selected', b.dataset.diaper === diaperType));
+      document.getElementById('diaper-note').value = d.note || '';
+      document.getElementById('diaper-datetime').value = ts;
+      document.getElementById('diaper-save-btn').textContent = 'Update Diaper';
+      document.querySelector('#overlay-diaper .sheet-title').textContent = '🩲 Edit Diaper';
+      openModal('overlay-diaper'); break;
+
+    case 'potty':
+      pottyType = d.pottyType || 'pee';
+      document.querySelectorAll('[data-potty]').forEach(b => b.classList.toggle('selected', b.dataset.potty === pottyType));
+      document.getElementById('potty-note').value = d.note || '';
+      document.getElementById('potty-datetime').value = ts;
+      document.getElementById('potty-save-btn').textContent = 'Update Potty';
+      document.querySelector('#overlay-potty .sheet-title').textContent = '🚽 Edit Potty';
+      openModal('overlay-potty'); break;
+
+    case 'meal':
+      mealType = d.mealType || 'breakfast';
+      mealQuality = d.mealQuality || 'well';
+      document.querySelectorAll('[data-meal]').forEach(b => b.classList.toggle('active', b.dataset.meal === mealType));
+      document.querySelectorAll('[data-quality]').forEach(b => b.classList.toggle('selected', b.dataset.quality === mealQuality));
+      document.getElementById('meal-food').value = d.food || '';
+      document.getElementById('meal-datetime').value = ts;
+      document.getElementById('meal-save-btn').textContent = 'Update Meal';
+      document.querySelector('#overlay-meal .sheet-title').textContent = '🍽️ Edit Meal';
+      openModal('overlay-meal'); break;
+
+    case 'activity':
+      activityType = d.activityType || 'outside';
+      document.querySelectorAll('[data-activity]').forEach(b => b.classList.toggle('selected', b.dataset.activity === activityType));
+      document.getElementById('activity-duration').value = d.duration_min || '';
+      document.getElementById('activity-datetime').value = ts;
+      document.getElementById('activity-save-btn').textContent = 'Update Activity';
+      document.querySelector('#overlay-activity .sheet-title').textContent = '⚽ Edit Activity';
+      openModal('overlay-activity'); break;
+
+    case 'mood':
+      moodVal = d.mood || 5;
+      document.querySelectorAll('[data-mood]').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.mood) === moodVal));
+      document.getElementById('mood-note').value = d.note || '';
+      document.getElementById('mood-datetime').value = ts;
+      document.getElementById('mood-save-btn').textContent = 'Update Mood';
+      document.querySelector('#overlay-mood .sheet-title').textContent = '😊 Edit Mood';
+      openModal('overlay-mood'); break;
+
+    case 'medicine':
+      document.getElementById('medicine-name').value = d.name || '';
+      document.getElementById('medicine-dose').value = d.dose || '';
+      document.getElementById('medicine-note').value = d.note || '';
+      document.getElementById('medicine-datetime').value = ts;
+      document.getElementById('medicine-save-btn').textContent = 'Update';
+      document.querySelector('#overlay-medicine .sheet-title').textContent = '💊 Edit Medicine';
+      openModal('overlay-medicine'); break;
+
+    case 'temperature':
+      document.getElementById('temp-value').value = d.value || '';
+      tempUnit = d.unit || 'C';
+      document.querySelectorAll('[data-unit]').forEach(b => b.classList.toggle('active', b.dataset.unit === tempUnit));
+      document.getElementById('temp-note').value = d.note || '';
+      document.getElementById('temp-datetime').value = ts;
+      document.getElementById('temp-save-btn').textContent = 'Update';
+      document.querySelector('#overlay-temp .sheet-title').textContent = '🌡️ Edit Temp';
+      openModal('overlay-temp'); break;
+
+    case 'growth':
+      document.getElementById('growth-weight').value = d.weightKg || '';
+      document.getElementById('growth-height').value = d.heightCm || '';
+      document.getElementById('growth-head').value = d.headCm || '';
+      document.getElementById('growth-datetime').value = ts;
+      document.getElementById('growth-save-btn').textContent = 'Update';
+      document.querySelector('#overlay-growth .sheet-title').textContent = '📏 Edit Growth';
+      openModal('overlay-growth'); break;
+
+    case 'milestone':
+      document.getElementById('milestone-title').value = d.title || '';
+      document.getElementById('milestone-note').value = d.note || '';
+      document.getElementById('milestone-datetime').value = ts;
+      document.getElementById('milestone-save-btn').textContent = 'Update';
+      document.querySelector('#overlay-milestone .sheet-title').textContent = '⭐ Edit Milestone';
+      openModal('overlay-milestone'); break;
+
+    case 'burp':
+      // For burp just allow re-logging at a different time via a quick confirm
+      const newTs = prompt('Edit burp time (leave blank for now):', isoToDTL(ev.timestamp));
+      if (newTs !== null) {
+        const idx = state.events.findIndex(e => e.id === id);
+        if (idx >= 0) state.events[idx].timestamp = dtlToISO(newTs || nowDTL());
+        save(); renderTimeline(); renderHome();
+      }
+      editingEventId = null;
+      return;
+
+    default:
+      editingEventId = null; return;
+  }
+}
+
+function resetEditMode(modalId, titleText, btnId, btnText) {
+  editingEventId = null;
+  document.querySelector(`#${modalId} .sheet-title`).textContent = titleText;
+  if (btnId) document.getElementById(btnId).textContent = btnText;
+}
+
+function saveOrUpdate(type, data, datetimeId) {
+  const ts = dtlToISO(document.getElementById(datetimeId)?.value || nowDTL());
+  if (editingEventId) {
+    const idx = state.events.findIndex(e => e.id === editingEventId);
+    if (idx >= 0) { state.events[idx].timestamp = ts; state.events[idx].data = data; }
+    editingEventId = null;
+  } else {
+    const baby = getActiveBaby();
+    if (!baby) return;
+    state.events.push({ id: uuid(), babyId: baby.id, type, timestamp: ts, data });
+  }
+  save();
+  renderHome();
+  renderLogTab();
+  if (document.getElementById('tab-timeline').classList.contains('active')) renderTimeline();
+}
+
+// ── Calendar ───────────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calSelectedDay = null;
+let timelineView = 'list';
+
+function setTimelineView(v) {
+  timelineView = v;
+  document.getElementById('view-btn-list').classList.toggle('active', v === 'list');
+  document.getElementById('view-btn-cal').classList.toggle('active', v === 'calendar');
+  document.getElementById('timeline-list-wrap').style.display = v === 'list' ? 'block' : 'none';
+  document.getElementById('timeline-cal-wrap').style.display = v === 'calendar' ? 'block' : 'none';
+  if (v === 'calendar') renderCalendar();
+  else renderTimeline();
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = `${months[calMonth]} ${calYear}`;
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  // Monday-first: 0=Mon..6=Sun
+  let startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  // Build event map for this month
+  const eventMap = {};
+  state.events.forEach(ev => {
+    if (ev.babyId !== baby.id) return;
+    const d = new Date(ev.timestamp);
+    if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
+      const day = d.getDate();
+      if (!eventMap[day]) eventMap[day] = [];
+      eventMap[day].push(ev.type);
+    }
+  });
+
+  const today = new Date();
+  const isToday = (day) => today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===day;
+
+  let cells = '';
+  // Empty cells for offset
+  for (let i = 0; i < startOffset; i++) cells += '<div class="cal-day empty"></div>';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const types = [...new Set(eventMap[day] || [])].slice(0, 5);
+    const dots = types.map(t => `<div class="cal-dot" style="background:${EVENT_META[t]?.color||'var(--muted)'}"></div>`).join('');
+    const sel = calSelectedDay === day ? 'selected' : '';
+    const tod = isToday(day) && !sel ? 'today' : '';
+    cells += `<div class="cal-day ${sel} ${tod}" onclick="calSelectDay(${day})">
+      <div class="cal-day-num">${day}</div>
+      ${dots ? `<div class="cal-dots">${dots}</div>` : ''}
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = cells;
+  if (calSelectedDay) renderCalDayEvents(calSelectedDay);
+}
+
+function calSelectDay(day) {
+  calSelectedDay = calSelectedDay === day ? null : day;
+  renderCalendar();
+  if (calSelectedDay) renderCalDayEvents(day);
+  else document.getElementById('cal-day-events').innerHTML = '';
+}
+
+function renderCalDayEvents(day) {
+  const baby = getActiveBaby();
+  if (!baby) return;
+  const start = new Date(calYear, calMonth, day, 0, 0, 0);
+  const end = new Date(calYear, calMonth, day, 23, 59, 59);
+  const evs = state.events
+    .filter(e => e.babyId === baby.id && new Date(e.timestamp) >= start && new Date(e.timestamp) <= end)
+    .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const el = document.getElementById('cal-day-events');
+  if (!evs.length) { el.innerHTML = `<div class="timeline-empty" style="padding:20px 0;">No events on this day</div>`; return; }
+  el.innerHTML = `<div class="timeline-day-label">${day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][calMonth]}</div>` +
+    evs.map(e => timelineItemHTML(e)).join('');
+}
+
+// ── Settings ───────────────────────────────────────────────
+function openBabySettings() {
+  const baby = getActiveBaby();
+  const el = document.getElementById('settings-baby-info');
+  if (baby) {
+    el.innerHTML = `<div class="drawer-item" style="cursor:default;">
+      <div class="drawer-avatar active">${baby.emoji || '🍼'}</div>
+      <div class="drawer-info">
+        <div class="drawer-name">${baby.name}</div>
+        <div class="drawer-meta">${formatAge(baby.dob)} · ${getBabyMode(baby) === 'baby' ? 'Baby Mode' : 'Toddler Mode'}</div>
+      </div>
+      <button class="btn-sm" onclick="closeModal('overlay-settings');openAddBabyModal('${baby.id}')">Edit</button>
+    </div>`;
+  } else {
+    el.innerHTML = '';
+  }
+  openModal('overlay-settings');
+}
+
+// ── Export ─────────────────────────────────────────────────
+function exportData() {
+  const data = { version: 1, exportedAt: new Date().toISOString(), ...state };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `nestly-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Backup downloaded!');
+}
+
+// ── Import ─────────────────────────────────────────────────
+function importData() {
+  document.getElementById('import-file-input').click();
+}
+
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.babies || !data.events) throw new Error('Invalid backup file');
+      if (!confirm(`Import ${data.babies.length} profile(s) and ${data.events.length} events? This will replace all current data.`)) return;
+      state.babies = data.babies;
+      state.events = data.events;
+      state.activeBabyId = data.activeBabyId || data.babies[0]?.id || null;
+      save();
+      closeAllModals();
+      showMainUI();
+      showToast('✅ Data imported successfully!');
+    } catch(err) {
+      alert('Could not read backup file. Make sure it\'s a valid Nestly JSON backup.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── Clear all data ─────────────────────────────────────────
+function clearAllData() {
+  if (!confirm('This will permanently delete all baby profiles and tracking data. Are you sure?')) return;
+  state = { babies: [], events: [], activeBabyId: null };
+  save();
+  closeAllModals();
+  document.getElementById('main-ui').style.display = 'none';
+  document.getElementById('welcome').classList.add('visible');
+}
+
+// ── PWA ────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ── Boot ───────────────────────────────────────────────────
+initApp();
+</script>
+</body>
+</html>
