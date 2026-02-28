@@ -1145,6 +1145,13 @@
       <div class="section-label mt-12">Data</div>
       <div class="settings-row">
         <div>
+          <div class="settings-label">Sync to Cloud</div>
+          <div class="settings-sub">Force-push local data to Firebase</div>
+        </div>
+        <button class="btn-sm teal" id="sync-now-btn" onclick="syncNow()">↑ Sync</button>
+      </div>
+      <div class="settings-row">
+        <div>
           <div class="settings-label">Export Backup</div>
           <div class="settings-sub">Download all data as JSON</div>
         </div>
@@ -1283,6 +1290,29 @@ function save() {
     }).catch(e => console.warn('Firestore save failed:', e));
   }
 }
+async function syncNow() {
+  const btn = document.getElementById('sync-now-btn');
+  const user = auth.currentUser;
+  if (!user) { showToast('⚠️ Not signed in'); return; }
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  localStorage.setItem('nestly_state', JSON.stringify(state));
+  const sharedIds = new Set((state.babies || []).filter(b => b.isShared).map(b => b.id));
+  try {
+    await db.collection('users').doc(user.uid).set({
+      babies: (state.babies || []).filter(b => !b.isShared),
+      events: (state.events || []).filter(e => !sharedIds.has(e.babyId)),
+      activeBabyId: state.activeBabyId,
+      sharedBabyIds: state.sharedBabyIds || []
+    });
+    showToast('✅ Synced to cloud');
+    haptic('success');
+  } catch(e) {
+    showToast('❌ Sync failed');
+  } finally {
+    if (btn) { btn.textContent = '↑ Sync'; btn.disabled = false; }
+  }
+}
+
 function loadFromLocal() {
   try {
     const raw = localStorage.getItem('nestly_state');
