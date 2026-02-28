@@ -27,12 +27,12 @@
       --sleep:     #60a5fa;
       --burp:      #34d399;
       --meal:      #fb923c;
-      --potty:     #a78bfa;
-      --activity:  #38bdf8;
+      --potty:     #818cf8;
+      --activity:  #22d3ee;
       --mood:      #f472b6;
       --medicine:  #f87171;
-      --temp:      #fb7185;
-      --growth:    #a3e635;
+      --temp:      #fda4af;
+      --growth:    #86efac;
       --milestone: #fcd34d;
       --nav-h:     68px;
       --header-h:  60px;
@@ -40,6 +40,25 @@
       --radius:    20px;
       --radius-sm: 12px;
     }
+
+    /* ── Light mode overrides ────────────────────────────── */
+    [data-theme="light"] {
+      --bg:        #f0f4f8;
+      --surface:   #ffffff;
+      --surface2:  #e8eef5;
+      --surface3:  #dde5ef;
+      --border:    rgba(0,0,0,0.08);
+      --border-hi: rgba(0,0,0,0.14);
+      --text:      #0f172a;
+      --muted:     #64748b;
+    }
+    [data-theme="light"] body { background: var(--bg); color: var(--text); }
+    [data-theme="light"] input,
+    [data-theme="light"] select,
+    [data-theme="light"] textarea { background: var(--surface2); border-color: var(--border); color: var(--text); color-scheme: light; }
+    [data-theme="light"] .header,
+    [data-theme="light"] .bottom-nav { background: rgba(240,244,248,0.92); }
+    [data-theme="light"] .toast { background: #1e293b; color: #f1f5f9; border-color: rgba(255,255,255,0.1); }
 
     /* ── Reset ───────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -722,11 +741,33 @@
             <div class="seg-btn" data-side="B" onclick="selectBreastSide('B')">Both</div>
           </div>
         </div>
-        <div class="timer-display">
-          <div class="timer-num" id="breast-timer-num">0:00</div>
-          <div class="timer-label" id="breast-timer-label">Tap to start timer</div>
+        <div class="form-row">
+          <label class="form-label">Track Duration</label>
+          <div class="seg-control">
+            <div class="seg-btn active" data-bmode="timer" onclick="selectBreastMode('timer')">Timer</div>
+            <div class="seg-btn" data-bmode="manual" onclick="selectBreastMode('manual')">Start / End</div>
+          </div>
         </div>
-        <button class="btn-secondary" id="breast-timer-btn" onclick="toggleBreastTimer()">▶ Start Timer</button>
+        <!-- Timer mode -->
+        <div id="breast-timer-wrap">
+          <div class="timer-display">
+            <div class="timer-num" id="breast-timer-num">0:00</div>
+            <div class="timer-label" id="breast-timer-label">Tap to start timer</div>
+          </div>
+          <button class="btn-secondary" id="breast-timer-btn" onclick="toggleBreastTimer()">▶ Start Timer</button>
+        </div>
+        <!-- Manual start/end mode -->
+        <div id="breast-manual-wrap" style="display:none;">
+          <div class="form-row">
+            <label class="form-label">Start Time</label>
+            <input type="datetime-local" id="breast-start-time">
+          </div>
+          <div class="form-row">
+            <label class="form-label">End Time</label>
+            <input type="datetime-local" id="breast-end-time" oninput="updateBreastDuration()">
+          </div>
+          <div id="breast-duration-preview" style="display:none;text-align:center;font-size:13px;font-weight:700;color:var(--sleep);padding:6px 0 4px;"></div>
+        </div>
       </div>
 
       <div class="form-row mt-12">
@@ -1089,6 +1130,17 @@
       <div class="join-code-row">
         <input type="text" id="join-code-input" placeholder="ABC123" maxlength="6" oninput="this.value=this.value.toUpperCase()">
         <button onclick="joinFromSettings()">Join</button>
+      </div>
+      <div class="section-label mt-12">Appearance</div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Light Mode</div>
+          <div class="toggle-sub">Switch between dark and light theme</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this.checked)">
+          <div class="toggle-track"></div>
+        </label>
       </div>
       <div class="section-label mt-12">Data</div>
       <div class="settings-row">
@@ -2075,6 +2127,7 @@ function logEvent(type, data = {}) {
 let feedType = 'bottle';
 let formulaType = 'formula';
 let breastSide = 'L';
+let breastMode = 'timer';
 let ozVal = 3.0;
 let breastTimerStart = null;
 let breastTimerInterval = null;
@@ -2102,6 +2155,34 @@ function selectBreastSide(s) {
   document.querySelectorAll('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === s));
 }
 
+function selectBreastMode(mode) {
+  breastMode = mode;
+  document.querySelectorAll('[data-bmode]').forEach(b => b.classList.toggle('active', b.dataset.bmode === mode));
+  document.getElementById('breast-timer-wrap').style.display = mode === 'timer' ? 'block' : 'none';
+  document.getElementById('breast-manual-wrap').style.display = mode === 'manual' ? 'block' : 'none';
+  if (mode === 'manual') {
+    const now = nowDTL();
+    if (!document.getElementById('breast-start-time').value) document.getElementById('breast-start-time').value = now;
+    if (!document.getElementById('breast-end-time').value) document.getElementById('breast-end-time').value = now;
+    updateBreastDuration();
+  }
+}
+
+function updateBreastDuration() {
+  const s = document.getElementById('breast-start-time').value;
+  const e = document.getElementById('breast-end-time').value;
+  const preview = document.getElementById('breast-duration-preview');
+  if (s && e) {
+    const ms = new Date(e) - new Date(s);
+    if (ms > 0) {
+      preview.textContent = '⏱ Duration: ' + formatDuration(ms);
+      preview.style.display = 'block';
+      return;
+    }
+  }
+  preview.style.display = 'none';
+}
+
 function toggleBreastTimer() {
   if (breastTimerStart) {
     clearInterval(breastTimerInterval);
@@ -2124,11 +2205,26 @@ function saveFeed() {
   else if (feedType === 'mixed') { data.oz = ozVal; }
   else if (feedType === 'breast') {
     data.side = breastSide;
-    if (breastTimerStart) { data.duration_min = Math.round((Date.now() - breastTimerStart) / 60000); clearInterval(breastTimerInterval); breastTimerStart = null; }
+    if (breastMode === 'manual') {
+      const startVal = document.getElementById('breast-start-time').value;
+      const endVal = document.getElementById('breast-end-time').value;
+      if (startVal && endVal) {
+        const ms = new Date(endVal) - new Date(startVal);
+        if (ms > 0) { data.duration_min = Math.round(ms / 60000); data.breastStart = dtlToISO(startVal); data.breastEnd = dtlToISO(endVal); }
+      }
+      if (startVal) document.getElementById('feed-datetime').value = startVal;
+    } else {
+      if (breastTimerStart) { data.duration_min = Math.round((Date.now() - breastTimerStart) / 60000); clearInterval(breastTimerInterval); breastTimerStart = null; }
+    }
   }
   if (note) data.note = note;
   const isEdit = saveOrUpdate('feed', data, 'feed-datetime');
   document.getElementById('feed-note').value = '';
+  document.getElementById('breast-start-time').value = '';
+  document.getElementById('breast-end-time').value = '';
+  document.getElementById('breast-duration-preview').style.display = 'none';
+  breastMode = 'timer';
+  selectBreastMode('timer');
   resetEditMode('overlay-feed', '🍼 Feed', 'feed-save-btn', 'Save Feed');
   closeModal('overlay-feed');
   showToast(isEdit ? '🍼 Feed updated' : '🍼 Feed logged!');
@@ -2662,6 +2758,14 @@ function editEvent(id) {
       ozVal = d.oz || 3.0;
       document.getElementById('oz-display').textContent = ozVal.toFixed(1);
       selectFeedType(feedType);
+      if (feedType === 'breast' && d.breastStart) {
+        selectBreastMode('manual');
+        document.getElementById('breast-start-time').value = isoToDTL(d.breastStart);
+        document.getElementById('breast-end-time').value = isoToDTL(d.breastEnd || ts);
+        updateBreastDuration();
+      } else {
+        selectBreastMode('timer');
+      }
       document.getElementById('feed-note').value = d.note || '';
       document.getElementById('feed-datetime').value = ts;
       document.getElementById('feed-save-btn').textContent = 'Update Feed';
@@ -2931,6 +3035,8 @@ function openBabySettings() {
   const user = auth.currentUser;
   const emailEl = document.getElementById('settings-user-email');
   if (emailEl && user) emailEl.textContent = user.email || user.displayName || 'Signed in';
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) toggle.checked = localStorage.getItem('nestly_theme') === 'light';
   openModal('overlay-settings');
 }
 
@@ -2995,7 +3101,19 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+// ── Theme ───────────────────────────────────────────────────
+function applyTheme(light) {
+  document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) toggle.checked = light;
+}
+function toggleTheme(isLight) {
+  localStorage.setItem('nestly_theme', isLight ? 'light' : 'dark');
+  applyTheme(isLight);
+}
+
 // ── Boot ───────────────────────────────────────────────────
+applyTheme(localStorage.getItem('nestly_theme') === 'light');
 initApp();
 </script>
 </body>
