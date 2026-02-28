@@ -1371,8 +1371,11 @@ async function loadSharedBabies(sharedBabyIds) {
 }
 
 async function shareBaby(babyId) {
-  const user = auth.currentUser;
+  // Force a fresh token before any Firestore writes
+  let user = auth.currentUser;
   if (!user) { showToast('❌ Please sign in first'); return; }
+  try { await user.getIdToken(true); } catch(e) { showToast('❌ Auth error: ' + e.code); return; }
+
   const baby = state.babies.find(b => b.id === babyId);
   if (!baby) return;
   if (baby.isShared) { openShareModal(babyId); return; }
@@ -1399,12 +1402,13 @@ async function shareBaby(babyId) {
     listenToSharedBaby(babyId);
     save();
     openShareModal(babyId);
-  } catch(e) { showToast('❌ Failed: ' + e.message); }
+  } catch(e) { showToast('❌ ' + (e.code || e.message)); console.error('shareBaby failed:', e); }
 }
 
 async function joinSharedBaby(code) {
   const user = auth.currentUser;
   if (!user) { showToast('❌ Please sign in first'); return; }
+  try { await user.getIdToken(true); } catch(e) { showToast('❌ Auth error: ' + e.code); return; }
   code = (code || '').trim().toUpperCase();
   if (!code) return;
   showToast('Looking up code…');
@@ -1430,7 +1434,7 @@ async function joinSharedBaby(code) {
     showMainUI();
     renderHeader();
     showToast('✅ Joined ' + baby.name + '!');
-  } catch(e) { showToast('❌ Join failed: ' + e.message); }
+  } catch(e) { showToast('❌ ' + (e.code || e.message)); console.error('joinSharedBaby failed:', e); }
 }
 
 function openShareModal(babyId) {
