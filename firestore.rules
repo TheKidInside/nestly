@@ -23,9 +23,10 @@ service cloud.firestore {
     // ── Shared babies ─────────────────────────────────────
     match /sharedBabies/{shareId} {
 
-      // Any current member can read the baby doc.
-      allow read: if request.auth != null &&
-        request.auth.uid in resource.data.memberUids;
+      // Any signed-in user can read the baby doc.
+      // Needed so a joiner can fetch baby info before they're added to memberUids.
+      // (The baby doc only holds profile data — name, emoji, dob — not tracking events.)
+      allow read: if request.auth != null;
 
       // Any signed-in user can create (they set ownerUid to themselves).
       allow create: if request.auth != null &&
