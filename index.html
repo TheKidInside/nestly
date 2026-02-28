@@ -2200,7 +2200,7 @@ function logEvent(type, data = {}) {
     writeSharedEvent(baby.id, ev).catch(err => {
       state.events = state.events.filter(e => e.id !== ev.id);
       renderHome(); renderLogTab();
-      showToast('❌ Sync failed');
+      showToast('❌ Sync failed: ' + (err.code || err.message));
     });
   } else {
     save();
@@ -2973,13 +2973,13 @@ function saveOrUpdate(type, data, datetimeId) {
     const idx = state.events.findIndex(e => e.id === editingEventId);
     if (idx >= 0) {
       state.events[idx].timestamp = ts; state.events[idx].data = data;
-      if (baby.isShared) writeSharedEvent(baby.id, state.events[idx]).catch(() => showToast('❌ Sync failed'));
+      if (baby.isShared) writeSharedEvent(baby.id, state.events[idx]).catch(err => showToast('❌ Sync failed: ' + (err.code || err.message)));
     }
     editingEventId = null;
   } else {
     const ev = { id: uuid(), babyId: baby.id, type, timestamp: ts, data };
     state.events.push(ev);
-    if (baby.isShared) writeSharedEvent(baby.id, ev).catch(() => { state.events = state.events.filter(e => e.id !== ev.id); showToast('❌ Sync failed'); });
+    if (baby.isShared) writeSharedEvent(baby.id, ev).catch(err => { state.events = state.events.filter(e => e.id !== ev.id); showToast('❌ Sync failed: ' + (err.code || err.message)); });
   }
   if (!baby.isShared) save();
   renderHome(); renderLogTab();
