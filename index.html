@@ -1302,27 +1302,40 @@ async function runDiagnostic() {
   if (!user) { showToast('❌ Not signed in'); return; }
   showToast('Testing…');
   const results = [];
+  // Force network (disable offline cache for this test)
+  try { await db.enableNetwork(); } catch(e) {}
   // 1. Auth token
   try {
-    const token = await user.getIdToken(true);
-    results.push('✅ Auth token OK (uid: ' + user.uid.slice(0,8) + '…)');
+    await user.getIdToken(true);
+    results.push('✅ Auth OK · uid: ' + user.uid.slice(0,8) + '…');
+    results.push('   email: ' + (user.email || 'n/a'));
   } catch(e) { results.push('❌ Token: ' + e.code); }
-  // 2. Write to users/{uid}
+  // 2. Read users/{uid} (weaker test)
   try {
-    await db.collection('users').doc(user.uid).set({ _ping: true }, { merge: true });
+    await db.collection('users').doc(user.uid).get();
+    results.push('✅ users read OK');
+  } catch(e) { results.push('❌ users read: ' + e.code); }
+  // 3. Write to users/{uid}
+  try {
+    await db.collection('users').doc(user.uid).set({ _ping: Date.now() }, { merge: true });
     results.push('✅ users write OK');
   } catch(e) { results.push('❌ users write: ' + e.code); }
-  // 3. Write to sharedBabies test doc
+  // 4. READ sharedBabies (read first, then write)
+  try {
+    await db.collection('sharedBabies').limit(1).get();
+    results.push('✅ sharedBabies read OK');
+  } catch(e) { results.push('❌ sharedBabies read: ' + e.code); }
+  // 5. Write to sharedBabies
   try {
     const ref = db.collection('sharedBabies').doc('_diag_' + user.uid);
-    await ref.set({ test: true, uid: user.uid });
+    await ref.set({ test: true, uid: user.uid, t: Date.now() });
     await ref.delete();
     results.push('✅ sharedBabies write OK');
   } catch(e) { results.push('❌ sharedBabies write: ' + e.code); }
-  // 4. Write to inviteCodes test doc
+  // 6. Write to inviteCodes
   try {
-    const ref = db.collection('inviteCodes').doc('_DIAG');
-    await ref.set({ test: true });
+    const ref = db.collection('inviteCodes').doc('_DIAG_' + user.uid.slice(0,6));
+    await ref.set({ test: true, t: Date.now() });
     await ref.delete();
     results.push('✅ inviteCodes write OK');
   } catch(e) { results.push('❌ inviteCodes write: ' + e.code); }
