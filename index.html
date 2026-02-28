@@ -2127,10 +2127,12 @@ function saveFeed() {
     if (breastTimerStart) { data.duration_min = Math.round((Date.now() - breastTimerStart) / 60000); clearInterval(breastTimerInterval); breastTimerStart = null; }
   }
   if (note) data.note = note;
-  saveOrUpdate('feed', data, 'feed-datetime');
+  const isEdit = saveOrUpdate('feed', data, 'feed-datetime');
   document.getElementById('feed-note').value = '';
   resetEditMode('overlay-feed', '🍼 Feed', 'feed-save-btn', 'Save Feed');
   closeModal('overlay-feed');
+  showToast(isEdit ? '🍼 Feed updated' : '🍼 Feed logged!');
+  haptic('success');
 }
 
 // ── Diaper Modal ───────────────────────────────────────────
@@ -2143,12 +2145,14 @@ function selectDiaperType(t) {
 
 function saveDiaper() {
   const note = document.getElementById('diaper-note').value.trim();
-  saveOrUpdate('diaper', { diaperType, note: note || undefined }, 'diaper-datetime');
+  const isEdit = saveOrUpdate('diaper', { diaperType, note: note || undefined }, 'diaper-datetime');
   document.getElementById('diaper-note').value = '';
   diaperType = 'wet';
   document.querySelectorAll('[data-diaper]').forEach(b => b.classList.toggle('selected', b.dataset.diaper === 'wet'));
   resetEditMode('overlay-diaper', '🩲 Diaper', 'diaper-save-btn', 'Save Diaper');
   closeModal('overlay-diaper');
+  showToast(isEdit ? '🩲 Diaper updated' : '🩲 Diaper logged!');
+  haptic('success');
 }
 
 // ── Potty Modal ────────────────────────────────────────────
@@ -2161,12 +2165,14 @@ function selectPottyType(t) {
 
 function savePotty() {
   const note = document.getElementById('potty-note').value.trim();
-  saveOrUpdate('potty', { pottyType, note: note || undefined }, 'potty-datetime');
+  const isEdit = saveOrUpdate('potty', { pottyType, note: note || undefined }, 'potty-datetime');
   document.getElementById('potty-note').value = '';
   pottyType = 'pee';
   document.querySelectorAll('[data-potty]').forEach(b => b.classList.toggle('selected', b.dataset.potty === 'pee'));
   resetEditMode('overlay-potty', '🚽 Potty', 'potty-save-btn', 'Save Potty');
   closeModal('overlay-potty');
+  showToast(isEdit ? '🚽 Potty updated' : '🚽 Potty logged!');
+  haptic('success');
 }
 
 // ── Sleep ──────────────────────────────────────────────────
@@ -2231,6 +2237,7 @@ function confirmStopSleep() {
   renderHome();
   renderLogTab();
   showToast(`💤 Sleep logged · ${duration}`);
+  haptic('success');
 }
 
 // ── Toast ──────────────────────────────────────────────────
@@ -2244,10 +2251,23 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 1800);
 }
 
+// ── Haptic feedback (mobile) ───────────────────────────────
+function haptic(style = 'medium') {
+  if (!navigator.vibrate) return;
+  if (style === 'light') navigator.vibrate(10);
+  else if (style === 'medium') navigator.vibrate(18);
+  else if (style === 'success') navigator.vibrate([10, 40, 18]);
+}
+
 // ── Burp ───────────────────────────────────────────────────
+let _lastBurpTime = 0;
 function logBurp() {
+  const now = Date.now();
+  if (now - _lastBurpTime < 2000) return;
+  _lastBurpTime = now;
   logEvent('burp', {});
   showToast('👋 Burp logged!');
+  haptic('success');
 }
 
 // ── Meal Modal ─────────────────────────────────────────────
@@ -2266,11 +2286,13 @@ function selectMealQuality(q) {
 
 function saveMeal() {
   const food = document.getElementById('meal-food').value.trim();
-  saveOrUpdate('meal', { mealType, mealQuality, food: food || undefined }, 'meal-datetime');
+  const isEdit = saveOrUpdate('meal', { mealType, mealQuality, food: food || undefined }, 'meal-datetime');
   document.getElementById('meal-food').value = '';
   mealType = 'breakfast'; mealQuality = 'well';
   resetEditMode('overlay-meal', '🍽️ Meal', 'meal-save-btn', 'Save Meal');
   closeModal('overlay-meal');
+  showToast(isEdit ? '🍽️ Meal updated' : '🍽️ Meal logged!');
+  haptic('success');
 }
 
 // ── Activity Modal ─────────────────────────────────────────
@@ -2283,11 +2305,13 @@ function selectActivityType(t) {
 
 function saveActivity() {
   const dur = parseInt(document.getElementById('activity-duration').value) || null;
-  saveOrUpdate('activity', { activityType, duration_min: dur || undefined }, 'activity-datetime');
+  const isEdit = saveOrUpdate('activity', { activityType, duration_min: dur || undefined }, 'activity-datetime');
   document.getElementById('activity-duration').value = '';
   activityType = 'outside';
   resetEditMode('overlay-activity', '⚽ Activity', 'activity-save-btn', 'Save Activity');
   closeModal('overlay-activity');
+  showToast(isEdit ? '⚽ Activity updated' : '⚽ Activity logged!');
+  haptic('success');
 }
 
 // ── Mood Modal ─────────────────────────────────────────────
@@ -2300,11 +2324,13 @@ function selectMood(v) {
 
 function saveMood() {
   const note = document.getElementById('mood-note').value.trim();
-  saveOrUpdate('mood', { mood: moodVal, note: note || undefined }, 'mood-datetime');
+  const isEdit = saveOrUpdate('mood', { mood: moodVal, note: note || undefined }, 'mood-datetime');
   document.getElementById('mood-note').value = '';
   moodVal = 5;
   resetEditMode('overlay-mood', '😊 Mood', 'mood-save-btn', 'Save Mood');
   closeModal('overlay-mood');
+  showToast(isEdit ? '😊 Mood updated' : '😊 Mood logged!');
+  haptic('success');
 }
 
 // ── Medicine Modal ─────────────────────────────────────────
@@ -2313,10 +2339,12 @@ function saveMedicine() {
   const dose = document.getElementById('medicine-dose').value.trim();
   const note = document.getElementById('medicine-note').value.trim();
   if (!name) { showToast('⚠️ Enter medicine name'); return; }
-  saveOrUpdate('medicine', { name, dose: dose || undefined, note: note || undefined }, 'medicine-datetime');
+  const isEdit = saveOrUpdate('medicine', { name, dose: dose || undefined, note: note || undefined }, 'medicine-datetime');
   ['medicine-name','medicine-dose','medicine-note'].forEach(id => document.getElementById(id).value = '');
   resetEditMode('overlay-medicine', '💊 Medicine', 'medicine-save-btn', 'Save');
   closeModal('overlay-medicine');
+  showToast(isEdit ? '💊 Medicine updated' : '💊 Medicine logged!');
+  haptic('success');
 }
 
 // ── Temperature Modal ──────────────────────────────────────
@@ -2331,11 +2359,13 @@ function saveTemp() {
   const val = parseFloat(document.getElementById('temp-value').value);
   const note = document.getElementById('temp-note').value.trim();
   if (isNaN(val)) { showToast('⚠️ Enter a temperature'); return; }
-  saveOrUpdate('temperature', { value: val, unit: tempUnit, note: note || undefined }, 'temp-datetime');
+  const isEdit = saveOrUpdate('temperature', { value: val, unit: tempUnit, note: note || undefined }, 'temp-datetime');
   document.getElementById('temp-value').value = '';
   document.getElementById('temp-note').value = '';
   resetEditMode('overlay-temp', '🌡️ Temperature', 'temp-save-btn', 'Save');
   closeModal('overlay-temp');
+  showToast(isEdit ? '🌡️ Temp updated' : '🌡️ Temp logged!');
+  haptic('success');
 }
 
 // ── Growth Modal ───────────────────────────────────────────
@@ -2344,10 +2374,12 @@ function saveGrowth() {
   const height = parseFloat(document.getElementById('growth-height').value) || null;
   const head = parseFloat(document.getElementById('growth-head').value) || null;
   if (!weight && !height) { showToast('⚠️ Enter weight or height'); return; }
-  saveOrUpdate('growth', { weightKg: weight || undefined, heightCm: height || undefined, headCm: head || undefined }, 'growth-datetime');
+  const isEdit = saveOrUpdate('growth', { weightKg: weight || undefined, heightCm: height || undefined, headCm: head || undefined }, 'growth-datetime');
   ['growth-weight','growth-height','growth-head'].forEach(id => document.getElementById(id).value = '');
   resetEditMode('overlay-growth', '📏 Growth', 'growth-save-btn', 'Save');
   closeModal('overlay-growth');
+  showToast(isEdit ? '📏 Growth updated' : '📏 Growth logged!');
+  haptic('success');
 }
 
 // ── Milestone Modal ────────────────────────────────────────
@@ -2355,11 +2387,13 @@ function saveMilestone() {
   const title = document.getElementById('milestone-title').value.trim();
   const note = document.getElementById('milestone-note').value.trim();
   if (!title) { showToast('⚠️ Enter a milestone'); return; }
-  saveOrUpdate('milestone', { title, note: note || undefined }, 'milestone-datetime');
+  const isEdit = saveOrUpdate('milestone', { title, note: note || undefined }, 'milestone-datetime');
   document.getElementById('milestone-title').value = '';
   document.getElementById('milestone-note').value = '';
   resetEditMode('overlay-milestone', '⭐ Milestone', 'milestone-save-btn', 'Save Milestone');
   closeModal('overlay-milestone');
+  showToast(isEdit ? '⭐ Milestone updated' : '⭐ Milestone saved!');
+  haptic('success');
 }
 
 // ── Timeline ───────────────────────────────────────────────
@@ -2465,6 +2499,8 @@ function deleteEvent(id) {
   }
   renderTimeline();
   renderHome();
+  showToast('🗑️ Entry deleted');
+  haptic('light');
 }
 
 // ── Stats ──────────────────────────────────────────────────
@@ -2740,7 +2776,8 @@ function resetEditMode(modalId, titleText, btnId, btnText) {
 function saveOrUpdate(type, data, datetimeId) {
   const ts = dtlToISO(document.getElementById(datetimeId)?.value || nowDTL());
   const baby = getActiveBaby();
-  if (!baby) return;
+  if (!baby) return false;
+  const isEdit = !!editingEventId;
   if (editingEventId) {
     const idx = state.events.findIndex(e => e.id === editingEventId);
     if (idx >= 0) {
@@ -2756,6 +2793,7 @@ function saveOrUpdate(type, data, datetimeId) {
   if (!baby.isShared) save();
   renderHome(); renderLogTab();
   if (document.getElementById('tab-timeline').classList.contains('active')) renderTimeline();
+  return isEdit;
 }
 
 // ── Calendar ───────────────────────────────────────────────
